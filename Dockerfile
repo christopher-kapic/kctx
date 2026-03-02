@@ -71,8 +71,6 @@ COPY --from=builder /app/packages/db/prisma ./packages/db/prisma
 # Create directories for volumes
 RUN mkdir -p /packages /data
 
-WORKDIR /app/apps/server
-
 EXPOSE 3000
 
-CMD ["node", "dist/index.mjs"]
+CMD ["sh", "-c", "[ \"$APPLY_SCHEMA\" = \"true\" ] && cd /app && pnpm --filter @kctx/db db:push; cd /app/apps/server && node dist/index.mjs"]

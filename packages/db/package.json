@@ -21,11 +21,11 @@
     "@prisma/adapter-libsql": "^7.2.0",
     "@prisma/client": "catalog:",
     "dotenv": "catalog:",
+    "prisma": "^7.2.0",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@kctx/config": "workspace:*",
-    "prisma": "^7.2.0",
     "typescript": "catalog:"
   }
 }
