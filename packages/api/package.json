@@ -1,0 +1,30 @@
+{
+  "name": "@kctx/api",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@kctx/auth": "workspace:*",
+    "@kctx/db": "workspace:*",
+    "@kctx/env": "workspace:*",
+    "@orpc/client": "catalog:",
+    "@orpc/openapi": "catalog:",
+    "@orpc/server": "catalog:",
+    "@orpc/zod": "catalog:",
+    "dotenv": "catalog:",
+    "simple-git": "^3.32.3",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@kctx/config": "workspace:*",
+    "hono": "catalog:",
+    "typescript": "catalog:"
+  }
+}

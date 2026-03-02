@@ -1,0 +1,3 @@
+{
+  "extends": "@kctx/config/tsconfig.base.json"
+}

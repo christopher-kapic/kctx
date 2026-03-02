@@ -1,0 +1,715 @@
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
+import { useForm } from "@tanstack/react-form";
+import { Pencil, Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+import z from "zod";
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { client, orpc, queryClient } from "@/utils/orpc";
+
+export const Route = createFileRoute("/_authenticated/packages")({
+  component: PackagesPage,
+});
+
+const PACKAGE_MANAGERS = ["npm", "pip", "cargo", "go", "gem", "maven", "other"];
+
+type PackageItem = {
+  id: string;
+  identifier: string;
+  displayName: string;
+  packageManager: string;
+  defaultTag: string;
+  kctxHelper: string | null;
+  urls: unknown;
+  Repository: {
+    id: string;
+    gitProvider: string;
+    orgOrUser: string;
+    repoName: string;
+  } | null;
+};
+
+function TableSkeleton() {
+  return (
+    <div className="rounded border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Display Name</TableHead>
+            <TableHead>Identifier</TableHead>
+            <TableHead>Package Manager</TableHead>
+            <TableHead>Repository</TableHead>
+            <TableHead>Default Tag</TableHead>
+            <TableHead className="w-20" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <TableRow key={i}>
+              <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+              <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+              <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+              <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+              <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+              <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+function CreatePackageDialog() {
+  const [open, setOpen] = useState(false);
+
+  const reposQuery = useQuery({
+    ...orpc.repository.list.queryOptions({}),
+    enabled: open,
+  });
+
+  const createRepoMutation = useMutation({
+    mutationFn: (input: { gitUrl: string; isPrivate: boolean; authMethod: "HTTPS" | "SSH" | "GITHUB_APP"; sshPrivateKey?: string }) =>
+      client.repository.create(input),
+  });
+
+  const createPackageMutation = useMutation({
+    mutationFn: (input: { identifier: string; displayName: string; packageManager: string; defaultTag: string; kctxHelper?: string; urls: Record<string, string>; repositoryId: string }) =>
+      client.package.create(input),
+  });
+
+  const form = useForm({
+    defaultValues: {
+      identifier: "",
+      displayName: "",
+      packageManager: "npm",
+      gitUrl: "",
+      isPrivate: false,
+      defaultTag: "latest",
+      kctxHelper: "",
+    },
+    onSubmit: async ({ value }) => {
+      try {
+        // Check if repo with this git URL already exists
+        const repos = reposQuery.data ?? [];
+        let repositoryId: string | undefined;
+
+        const existing = repos.find((r) => r.gitUrl === value.gitUrl);
+        if (existing) {
+          repositoryId = existing.id;
+        } else {
+          // Create new repository (will clone it)
+          const newRepo = await createRepoMutation.mutateAsync({
+            gitUrl: value.gitUrl,
+            isPrivate: value.isPrivate,
+            authMethod: value.isPrivate ? "SSH" : "HTTPS",
+          });
+          repositoryId = newRepo.id;
+        }
+
+        await createPackageMutation.mutateAsync({
+          identifier: value.identifier,
+          displayName: value.displayName,
+          packageManager: value.packageManager,
+          defaultTag: value.defaultTag,
+          kctxHelper: value.kctxHelper || undefined,
+          urls: {},
+          repositoryId,
+        });
+
+        toast.success("Package created successfully");
+        queryClient.invalidateQueries({ queryKey: orpc.package.list.queryOptions({}).queryKey });
+        queryClient.invalidateQueries({ queryKey: orpc.repository.list.queryOptions({}).queryKey });
+        setOpen(false);
+        form.reset();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to create package");
+      }
+    },
+    validators: {
+      onSubmit: z.object({
+        identifier: z.string().min(1, "Identifier is required"),
+        displayName: z.string().min(1, "Display name is required"),
+        packageManager: z.string().min(1, "Package manager is required"),
+        gitUrl: z.string().url("Must be a valid URL"),
+        isPrivate: z.boolean(),
+        defaultTag: z.string().min(1, "Default tag is required"),
+        kctxHelper: z.string(),
+      }),
+    },
+  });
+
+  const isSubmitting = createRepoMutation.isPending || createPackageMutation.isPending;
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={<Button size="sm" />}>
+        <Plus className="size-4" />
+        Add Package
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add Package</DialogTitle>
+          <DialogDescription>
+            Register a new package by providing its details and git repository URL.
+          </DialogDescription>
+        </DialogHeader>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            form.handleSubmit();
+          }}
+          className="space-y-4"
+        >
+          <form.Field name="identifier">
+            {(field) => (
+              <div className="space-y-1.5">
+                <Label htmlFor={field.name}>Identifier</Label>
+                <Input
+                  id={field.name}
+                  placeholder="e.g. react, express, lodash"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error) => (
+                  <p key={error?.message} className="text-xs text-destructive">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field name="displayName">
+            {(field) => (
+              <div className="space-y-1.5">
+                <Label htmlFor={field.name}>Display Name</Label>
+                <Input
+                  id={field.name}
+                  placeholder="e.g. React, Express, Lodash"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error) => (
+                  <p key={error?.message} className="text-xs text-destructive">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field name="packageManager">
+            {(field) => (
+              <div className="space-y-1.5">
+                <Label>Package Manager</Label>
+                <Select
+                  value={field.state.value}
+                  onValueChange={(value) => field.handleChange(value ?? "npm")}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select package manager" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PACKAGE_MANAGERS.map((pm) => (
+                      <SelectItem key={pm} value={pm}>
+                        {pm}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field name="gitUrl">
+            {(field) => (
+              <div className="space-y-1.5">
+                <Label htmlFor={field.name}>Git URL</Label>
+                <Input
+                  id={field.name}
+                  placeholder="https://github.com/user/repo"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  If a repository with this URL exists, it will be linked. Otherwise a new repo will be cloned.
+                </p>
+                {field.state.meta.errors.map((error) => (
+                  <p key={error?.message} className="text-xs text-destructive">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field name="isPrivate">
+            {(field) => (
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id={field.name}
+                  checked={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.checked)}
+                  className="size-4 rounded border"
+                />
+                <Label htmlFor={field.name} className="text-xs font-normal">
+                  Private repository (requires SSH key for cloning)
+                </Label>
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field name="defaultTag">
+            {(field) => (
+              <div className="space-y-1.5">
+                <Label htmlFor={field.name}>Default Tag</Label>
+                <Input
+                  id={field.name}
+                  placeholder="e.g. latest, stable, v1"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error) => (
+                  <p key={error?.message} className="text-xs text-destructive">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field name="kctxHelper">
+            {(field) => (
+              <div className="space-y-1.5">
+                <Label htmlFor={field.name}>
+                  Helper Text <span className="text-muted-foreground">(optional)</span>
+                </Label>
+                <Input
+                  id={field.name}
+                  placeholder="Instructions for AI context"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+              </div>
+            )}
+          </form.Field>
+
+          <DialogFooter>
+            <form.Subscribe>
+              {(state) => (
+                <Button
+                  type="submit"
+                  disabled={!state.canSubmit || isSubmitting}
+                  className="w-full sm:w-auto"
+                >
+                  {isSubmitting ? "Creating..." : "Create Package"}
+                </Button>
+              )}
+            </form.Subscribe>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditPackageSheet({
+  pkg,
+  open,
+  onOpenChange,
+}: {
+  pkg: PackageItem;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const updateMutation = useMutation({
+    mutationFn: (input: {
+      id: string;
+      displayName?: string;
+      defaultTag?: string;
+      kctxHelper?: string | null;
+      urls?: Record<string, string>;
+    }) => client.package.update(input),
+    onSuccess: () => {
+      toast.success("Package updated successfully");
+      queryClient.invalidateQueries({ queryKey: orpc.package.list.queryOptions({}).queryKey });
+      onOpenChange(false);
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Failed to update package");
+    },
+  });
+
+  const form = useForm({
+    defaultValues: {
+      displayName: pkg.displayName,
+      defaultTag: pkg.defaultTag,
+      kctxHelper: pkg.kctxHelper ?? "",
+      urls: JSON.stringify(pkg.urls ?? {}, null, 2),
+    },
+    onSubmit: async ({ value }) => {
+      let parsedUrls: Record<string, string> = {};
+      if (value.urls.trim()) {
+        try {
+          parsedUrls = JSON.parse(value.urls);
+        } catch {
+          toast.error("URLs must be valid JSON");
+          return;
+        }
+      }
+
+      updateMutation.mutate({
+        id: pkg.id,
+        displayName: value.displayName,
+        defaultTag: value.defaultTag,
+        kctxHelper: value.kctxHelper || null,
+        urls: parsedUrls,
+      });
+    },
+    validators: {
+      onSubmit: z.object({
+        displayName: z.string().min(1, "Display name is required"),
+        defaultTag: z.string().min(1, "Default tag is required"),
+        kctxHelper: z.string(),
+        urls: z.string(),
+      }),
+    },
+  });
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right">
+        <SheetHeader>
+          <SheetTitle>Edit Package</SheetTitle>
+          <SheetDescription>
+            Update details for <code className="rounded bg-muted px-1 py-0.5 text-xs">{pkg.identifier}</code>
+          </SheetDescription>
+        </SheetHeader>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            form.handleSubmit();
+          }}
+          className="flex flex-1 flex-col gap-4 overflow-y-auto p-4"
+        >
+          <form.Field name="displayName">
+            {(field) => (
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-displayName">Display Name</Label>
+                <Input
+                  id="edit-displayName"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error) => (
+                  <p key={error?.message} className="text-xs text-destructive">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field name="defaultTag">
+            {(field) => (
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-defaultTag">Default Tag</Label>
+                <Input
+                  id="edit-defaultTag"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error) => (
+                  <p key={error?.message} className="text-xs text-destructive">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field name="kctxHelper">
+            {(field) => (
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-kctxHelper">
+                  Helper Text <span className="text-muted-foreground">(optional)</span>
+                </Label>
+                <Input
+                  id="edit-kctxHelper"
+                  placeholder="Instructions for AI context"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field name="urls">
+            {(field) => (
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-urls">
+                  URLs <span className="text-muted-foreground">(JSON)</span>
+                </Label>
+                <textarea
+                  id="edit-urls"
+                  className="flex min-h-20 w-full rounded border bg-transparent px-3 py-2 font-mono text-xs shadow-xs outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Key-value pairs, e.g. {`{"docs": "https://..."}`}
+                </p>
+              </div>
+            )}
+          </form.Field>
+
+          <SheetFooter>
+            <form.Subscribe>
+              {(state) => (
+                <Button
+                  type="submit"
+                  disabled={!state.canSubmit || updateMutation.isPending}
+                  className="w-full"
+                >
+                  {updateMutation.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+              )}
+            </form.Subscribe>
+          </SheetFooter>
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function DeletePackageDialog({
+  pkg,
+  open,
+  onOpenChange,
+}: {
+  pkg: PackageItem;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [confirmText, setConfirmText] = useState("");
+
+  const deleteMutation = useMutation({
+    mutationFn: () => client.package.delete({ id: pkg.id }),
+    onSuccess: () => {
+      toast.success(`Package "${pkg.identifier}" deleted`);
+      queryClient.invalidateQueries({ queryKey: orpc.package.list.queryOptions({}).queryKey });
+      onOpenChange(false);
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Failed to delete package");
+    },
+  });
+
+  const canDelete = confirmText === pkg.identifier;
+
+  return (
+    <AlertDialog
+      open={open}
+      onOpenChange={(open) => {
+        if (!open) setConfirmText("");
+        onOpenChange(open);
+      }}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Package</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will permanently delete the package{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs font-medium">{pkg.identifier}</code>.
+            The linked repository will not be removed.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div className="space-y-1.5">
+          <Label htmlFor="confirm-delete">
+            Type <code className="rounded bg-muted px-1 py-0.5 text-xs font-medium">{pkg.identifier}</code> to confirm
+          </Label>
+          <Input
+            id="confirm-delete"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder={pkg.identifier}
+          />
+        </div>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            disabled={!canDelete || deleteMutation.isPending}
+            onClick={() => deleteMutation.mutate()}
+          >
+            {deleteMutation.isPending ? "Deleting..." : "Delete"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+function PackagesPage() {
+  const packagesQuery = useQuery(orpc.package.list.queryOptions({}));
+  const [editPkg, setEditPkg] = useState<PackageItem | null>(null);
+  const [deletePkg, setDeletePkg] = useState<PackageItem | null>(null);
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold leading-tight">Packages</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Manage your registered packages
+          </p>
+        </div>
+        <CreatePackageDialog />
+      </div>
+
+      {packagesQuery.isLoading ? (
+        <TableSkeleton />
+      ) : !packagesQuery.data?.length ? (
+        <div className="rounded border border-dashed p-8 text-center">
+          <p className="text-sm text-muted-foreground">
+            No packages yet. Add your first package to get started.
+          </p>
+        </div>
+      ) : (
+        <div className="rounded border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Display Name</TableHead>
+                <TableHead>Identifier</TableHead>
+                <TableHead>Package Manager</TableHead>
+                <TableHead>Repository</TableHead>
+                <TableHead>Default Tag</TableHead>
+                <TableHead className="w-20" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {packagesQuery.data.map((pkg) => (
+                <TableRow key={pkg.id}>
+                  <TableCell className="font-medium">
+                    {pkg.displayName}
+                  </TableCell>
+                  <TableCell>
+                    <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                      {pkg.identifier}
+                    </code>
+                  </TableCell>
+                  <TableCell>{pkg.packageManager}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {pkg.Repository
+                      ? `${pkg.Repository.orgOrUser}/${pkg.Repository.repoName}`
+                      : "—"}
+                  </TableCell>
+                  <TableCell>{pkg.defaultTag}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => setEditPkg(pkg as PackageItem)}
+                      >
+                        <Pencil className="size-3.5" />
+                        <span className="sr-only">Edit</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => setDeletePkg(pkg as PackageItem)}
+                      >
+                        <Trash2 className="size-3.5" />
+                        <span className="sr-only">Delete</span>
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {editPkg && (
+        <EditPackageSheet
+          key={editPkg.id}
+          pkg={editPkg}
+          open={!!editPkg}
+          onOpenChange={(open) => { if (!open) setEditPkg(null); }}
+        />
+      )}
+
+      {deletePkg && (
+        <DeletePackageDialog
+          key={deletePkg.id}
+          pkg={deletePkg}
+          open={!!deletePkg}
+          onOpenChange={(open) => { if (!open) setDeletePkg(null); }}
+        />
+      )}
+    </div>
+  );
+}

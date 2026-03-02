@@ -1,0 +1,56 @@
+enum AuthMethod {
+  HTTPS
+  SSH
+  GITHUB_APP
+}
+
+model Repository {
+  id         String     @id @default(cuid())
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @default(now()) @updatedAt
+  gitProvider String
+  orgOrUser  String
+  repoName   String
+  gitUrl     String
+  isPrivate  Boolean    @default(false)
+  authMethod AuthMethod @default(HTTPS)
+  clonedPath String?
+  Packages   Package[]
+
+  @@unique([gitProvider, orgOrUser, repoName])
+}
+
+model Package {
+  id             String     @id @default(cuid())
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @default(now()) @updatedAt
+  identifier     String     @unique
+  displayName    String
+  packageManager String
+  defaultTag     String
+  kctxHelper     String?
+  urls           Json
+  repositoryId   String
+  Repository     Repository @relation(fields: [repositoryId], references: [id], onDelete: Restrict)
+
+  @@index([repositoryId])
+}
+
+model SiteSettings {
+  id                String  @id @default("default")
+  sshCloningEnabled Boolean @default(true)
+  opencodeUrl       String  @default("")
+  opencodeTimeoutMs Int     @default(30000)
+}
+
+model ApiKey {
+  id        String    @id @default(cuid())
+  createdAt DateTime  @default(now())
+  name      String
+  hashedKey String    @unique
+  userId    String
+  User      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  revokedAt DateTime?
+
+  @@index([userId])
+}

@@ -1,0 +1,38 @@
+services:
+  opencode:
+    image: ghcr.io/anomalyco/opencode:latest
+    ports:
+      - "7168:4096"
+    volumes:
+      - opencode-config:/config
+      - opencode-state:/state
+      - packages:/packages
+    command: ["serve", "--hostname=0.0.0.0"]
+    environment:
+      - OPENCODE_CONFIG=/config/opencode.json
+      - XDG_STATE_HOME=/state
+      - OPENCODE_DISABLE_DEFAULT_PLUGINS=true
+    restart: unless-stopped
+
+  kinetic-context:
+    build: .
+    ports:
+      - "7167:3000"
+    volumes:
+      - packages:/packages
+      - kctx-data:/data
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=file:/data/kctx.db
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env (min 32 chars)}
+      - PACKAGES_PATH=/packages
+      - OPENCODE_URL=http://opencode:4096
+    depends_on:
+      - opencode
+    restart: unless-stopped
+
+volumes:
+  packages:
+  kctx-data:
+  opencode-config:
+  opencode-state:

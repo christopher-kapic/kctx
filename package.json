@@ -1,0 +1,34 @@
+{
+  "name": "kctx",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "check-types": "turbo check-types",
+    "dev:native": "turbo -F native dev",
+    "dev:web": "turbo -F web dev",
+    "dev:server": "turbo -F server dev",
+    "db:push": "turbo -F @kctx/db db:push",
+    "db:studio": "turbo -F @kctx/db db:studio",
+    "db:generate": "turbo -F @kctx/db db:generate",
+    "db:migrate": "turbo -F @kctx/db db:migrate",
+    "db:local": "turbo -F @kctx/db db:local"
+  },
+  "dependencies": {
+    "@kctx/env": "workspace:*",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@kctx/config": "workspace:*",
+    "@types/node": "catalog:",
+    "turbo": "^2.6.3",
+    "typescript": "catalog:"
+  },
+  "packageManager": "pnpm@10.20.0"
+}
