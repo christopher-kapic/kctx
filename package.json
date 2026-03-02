@@ -30,5 +30,13 @@
     "turbo": "^2.6.3",
     "typescript": "catalog:"
   },
-  "packageManager": "pnpm@10.20.0"
+  "packageManager": "pnpm@10.20.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/engines",
+      "prisma",
+      "esbuild",
+      "@libsql/linux-x64-gnu"
+    ]
+  }
 }
