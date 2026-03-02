@@ -121,6 +121,9 @@ importers:
       '@kctx/env':
         specifier: workspace:*
         version: link:../../packages/env
+      '@libsql/client':
+        specifier: ^0.17.0
+        version: 0.17.0
       '@modelcontextprotocol/sdk':
         specifier: ^1.27.1
         version: 1.27.1(zod@4.3.6)

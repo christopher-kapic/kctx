@@ -48,9 +48,18 @@ ENV NODE_ENV=production
 
 WORKDIR /app
 
-# Copy node_modules from builder (includes native binaries like @libsql/linux-x64-gnu
-# that the bundled server needs via dynamic require)
-COPY --from=builder /app/node_modules ./node_modules
+# Copy workspace config for pnpm install
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+COPY packages/db/package.json packages/db/
+COPY packages/auth/package.json packages/auth/
+COPY packages/api/package.json packages/api/
+COPY packages/env/package.json packages/env/
+COPY packages/config/package.json packages/config/
+COPY apps/server/package.json apps/server/
+COPY apps/web/package.json apps/web/
+
+# Install production dependencies only
+RUN pnpm install --frozen-lockfile --prod
 
 # Copy built server and web
 COPY --from=builder /app/apps/server/dist ./apps/server/dist

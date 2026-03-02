@@ -15,6 +15,7 @@
     "@kctx/api": "workspace:*",
     "@kctx/auth": "workspace:*",
     "@kctx/db": "workspace:*",
+    "@libsql/client": "^0.17.0",
     "@kctx/env": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@orpc/openapi": "catalog:",
