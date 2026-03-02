@@ -65,8 +65,9 @@ RUN pnpm install --frozen-lockfile --prod
 COPY --from=builder /app/apps/server/dist ./apps/server/dist
 COPY --from=builder /app/apps/web/dist ./apps/web/dist
 
-# Copy Prisma generated client and schema (needed at runtime)
+# Copy Prisma generated client, schema, and config (needed at runtime)
 COPY --from=builder /app/packages/db/prisma ./packages/db/prisma
+COPY --from=builder /app/packages/db/prisma.config.ts ./packages/db/prisma.config.ts
 
 # Create directories for volumes
 RUN mkdir -p /packages /data
