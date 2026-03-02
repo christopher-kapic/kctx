@@ -39,6 +39,7 @@ model Package {
 model SiteSettings {
   id                String  @id @default("default")
   sshCloningEnabled Boolean @default(true)
+  signupsEnabled    Boolean @default(true)
   opencodeUrl       String  @default("")
   opencodeTimeoutMs Int     @default(30000)
 }

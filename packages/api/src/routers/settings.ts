@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import prisma from "@kctx/db";
 
-import { adminProcedure, protectedProcedure } from "../index";
+import { adminProcedure, protectedProcedure, publicProcedure } from "../index";
 
 /** Get or create the singleton settings row */
 async function getOrCreateSettings() {
@@ -19,6 +19,11 @@ export const settingsRouter = {
     return { sshCloningEnabled: settings.sshCloningEnabled };
   }),
 
+  signupsEnabled: publicProcedure.handler(async () => {
+    const settings = await getOrCreateSettings();
+    return { signupsEnabled: settings.signupsEnabled };
+  }),
+
   get: adminProcedure.handler(async () => {
     return getOrCreateSettings();
   }),
@@ -27,6 +32,7 @@ export const settingsRouter = {
     .input(
       z.object({
         sshCloningEnabled: z.boolean().optional(),
+        signupsEnabled: z.boolean().optional(),
         opencodeUrl: z.string().optional(),
         opencodeTimeoutMs: z.number().int().positive().optional(),
       }),

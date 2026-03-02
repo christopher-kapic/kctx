@@ -63,6 +63,7 @@ function SiteSettingsCard() {
   const updateMutation = useMutation({
     mutationFn: (input: {
       sshCloningEnabled?: boolean;
+      signupsEnabled?: boolean;
       opencodeUrl?: string;
       opencodeTimeoutMs?: number;
     }) => client.settings.update(input),
@@ -132,6 +133,22 @@ function SiteSettingsCard() {
             checked={settingsQuery.data?.sshCloningEnabled ?? true}
             onCheckedChange={(checked) => {
               updateMutation.mutate({ sshCloningEnabled: !!checked });
+            }}
+            disabled={updateMutation.isPending}
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label>Signups Enabled</Label>
+            <p className="text-xs text-muted-foreground">
+              Allow new users to create accounts
+            </p>
+          </div>
+          <Switch
+            checked={settingsQuery.data?.signupsEnabled ?? true}
+            onCheckedChange={(checked) => {
+              updateMutation.mutate({ signupsEnabled: !!checked });
             }}
             disabled={updateMutation.isPending}
           />

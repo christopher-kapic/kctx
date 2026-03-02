@@ -2,6 +2,7 @@ import { StreamableHTTPTransport } from "@hono/mcp";
 import { createContext } from "@kctx/api/context";
 import { appRouter } from "@kctx/api/routers/index";
 import { auth } from "@kctx/auth";
+import prisma from "@kctx/db";
 import { env } from "@kctx/env/server";
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
 import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
@@ -31,6 +32,21 @@ if (env.CORS_ORIGIN) {
     }),
   );
 }
+
+// Block signups when disabled (but always allow if 0 users exist)
+app.on(["POST"], "/api/auth/sign-up/*", async (c, next) => {
+  const userCount = await prisma.user.count();
+  if (userCount === 0) {
+    return next();
+  }
+  const settings = await prisma.siteSettings
+    .findUnique({ where: { id: "default" } })
+    .then((s) => s ?? { signupsEnabled: true });
+  if (!settings.signupsEnabled) {
+    return c.json({ error: "Signups are currently disabled" }, 403);
+  }
+  return next();
+});
 
 app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 

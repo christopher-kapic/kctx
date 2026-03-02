@@ -1,9 +1,11 @@
 import { useForm } from "@tanstack/react-form";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import z from "zod";
 
 import { authClient } from "@/lib/auth-client";
+import { orpc } from "@/utils/orpc";
 
 import Loader from "./loader";
 import { Button } from "./ui/button";
@@ -15,6 +17,7 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
     from: "/",
   });
   const { isPending } = authClient.useSession();
+  const signupsQuery = useQuery(orpc.settings.signupsEnabled.queryOptions({}));
 
   const form = useForm({
     defaultValues: {
@@ -51,8 +54,28 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
     },
   });
 
-  if (isPending) {
+  if (isPending || signupsQuery.isLoading) {
     return <Loader />;
+  }
+
+  if (signupsQuery.data && !signupsQuery.data.signupsEnabled) {
+    return (
+      <div className="mx-auto w-full mt-10 max-w-md p-6 text-center">
+        <h1 className="mb-4 text-3xl font-bold">Signups Disabled</h1>
+        <p className="text-muted-foreground">
+          New account registration is currently disabled. Please contact an administrator.
+        </p>
+        <div className="mt-4">
+          <Button
+            variant="link"
+            onClick={onSwitchToSignIn}
+            className="text-indigo-600 hover:text-indigo-800"
+          >
+            Already have an account? Sign In
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return (
