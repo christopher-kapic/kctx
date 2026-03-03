@@ -1,5 +1,6 @@
 import * as pty from "node-pty";
 import type { WSContext } from "hono/ws";
+import { env } from "@kctx/env/server";
 
 export interface TerminalSession {
   id: string;
@@ -16,7 +17,7 @@ const TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 export function createSession(userId: string, ws: WSContext): string {
   const ptyProcess = pty.spawn(
     "opencode",
-    ["attach", "http://opencode:4096"],
+    ["attach", env.OPENCODE_URL ?? "http://opencode:4096"],
     {
       name: "xterm-256color",
       cols: 80,
