@@ -7,6 +7,7 @@ import {
   Package,
   Settings,
   FolderGit2,
+  Terminal,
 } from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
@@ -24,6 +25,7 @@ const navItems = [
 ] as const;
 
 const adminNavItems = [
+  { to: "/terminal", label: "Terminal", icon: Terminal },
   { to: "/models", label: "Models", icon: Brain },
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;

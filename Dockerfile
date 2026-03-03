@@ -3,8 +3,12 @@
 # Stage 1: Base image with system dependencies
 FROM node:20-slim AS base
 
-# Install openssl (required by Prisma) and git (required for cloning repos at runtime)
-RUN apt-get update -y && apt-get install -y openssl libssl-dev git && rm -rf /var/lib/apt/lists/*
+# Install openssl (required by Prisma), git (required for cloning repos at runtime),
+# and build tools (required for node-pty native compilation)
+RUN apt-get update -y && apt-get install -y \
+  openssl libssl-dev git \
+  build-essential g++ python3 make \
+  && rm -rf /var/lib/apt/lists/*
 
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@10.20.0 --activate

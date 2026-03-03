@@ -1,4 +1,5 @@
 import { StreamableHTTPTransport } from "@hono/mcp";
+import { createNodeWebSocket } from "@hono/node-ws";
 import { createContext } from "@kctx/api/context";
 import { appRouter } from "@kctx/api/routers/index";
 import { auth } from "@kctx/auth";
@@ -21,8 +22,16 @@ import {
   createMcpServer,
   mcpContextStorage,
 } from "./mcp/index.js";
+import {
+  createSession,
+  writeToSession,
+  closeSession,
+  resizeSession,
+  getSessions,
+} from "./terminal/index.js";
 
 const app = new Hono();
+const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 
 app.use(logger());
 if (env.CORS_ORIGIN) {
@@ -95,6 +104,65 @@ app.get("/api/packages/:id/image", async (c) => {
     },
   });
 });
+
+// Terminal session management REST endpoints
+app.get("/api/terminal/sessions", async (c) => {
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  if (!session?.user || session.user.role !== "admin") {
+    return c.json({ error: "Forbidden" }, 403);
+  }
+  return c.json(getSessions(session.user.id));
+});
+
+app.delete("/api/terminal/sessions/:id", async (c) => {
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  if (!session?.user || session.user.role !== "admin") {
+    return c.json({ error: "Forbidden" }, 403);
+  }
+  closeSession(c.req.param("id"));
+  return c.json({ success: true });
+});
+
+// WebSocket endpoint for terminal
+app.get(
+  "/ws/terminal",
+  upgradeWebSocket(async (c) => {
+    const session = await auth.api.getSession({
+      headers: c.req.raw.headers,
+    });
+
+    if (!session?.user || session.user.role !== "admin") {
+      return {};
+    }
+
+    let sessionId: string | null = c.req.query("sessionId") ?? null;
+
+    return {
+      onOpen(_event, ws) {
+        if (!sessionId) {
+          sessionId = createSession(session.user.id, ws);
+          ws.send(JSON.stringify({ type: "session", id: sessionId }));
+        }
+      },
+      onMessage(event, _ws) {
+        if (!sessionId) return;
+        const msg = JSON.parse(
+          typeof event.data === "string" ? event.data : "",
+        );
+        if (msg.type === "resize") {
+          resizeSession(sessionId, msg.cols, msg.rows);
+        } else if (msg.type === "input") {
+          writeToSession(sessionId, msg.data);
+        }
+      },
+      onClose() {
+        if (sessionId) {
+          closeSession(sessionId);
+        }
+      },
+    };
+  }),
+);
 
 // MCP Server setup
 const mcpServer = createMcpServer();
@@ -193,7 +261,7 @@ if (process.env.NODE_ENV === "production") {
   });
 }
 
-serve(
+const server = serve(
   {
     fetch: app.fetch,
     port: 3000,
@@ -202,3 +270,5 @@ serve(
     console.log(`Server is running on http://localhost:${info.port}`);
   },
 );
+
+injectWebSocket(server);
