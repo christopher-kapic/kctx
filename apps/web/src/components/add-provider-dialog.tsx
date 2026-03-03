@@ -24,9 +24,10 @@ import { orpc } from "@/utils/orpc";
 import { getSafeProvider } from "@/utils/config";
 import { OpenRouterProviderForm } from "./forms/openrouter-provider-form";
 import { OpenCodeZenProviderForm } from "./forms/opencode-zen-provider-form";
+import { GitHubCopilotProviderForm } from "./forms/github-copilot-provider-form";
 import { CustomProviderForm } from "./forms/custom-provider-form";
 
-type ProviderType = "openrouter" | "opencode-zen" | "custom";
+type ProviderType = "openrouter" | "opencode-zen" | "github-copilot" | "custom";
 
 export function AddProviderDialog({ className }: { className?: string }) {
   const [open, setOpen] = useState(false);
@@ -101,6 +102,7 @@ export function AddProviderDialog({ className }: { className?: string }) {
                 <SelectContent>
                   <SelectItem value="opencode-zen">OpenCode Zen</SelectItem>
                   <SelectItem value="openrouter">OpenRouter</SelectItem>
+                  <SelectItem value="github-copilot">GitHub Copilot</SelectItem>
                   <SelectItem value="custom">Custom Provider</SelectItem>
                 </SelectContent>
               </Select>
@@ -126,6 +128,13 @@ export function AddProviderDialog({ className }: { className?: string }) {
 
             {providerType === "openrouter" && (
               <OpenRouterProviderForm
+                onSave={handleProviderAdded}
+                onCancel={() => setProviderType(null)}
+              />
+            )}
+
+            {providerType === "github-copilot" && (
+              <GitHubCopilotProviderForm
                 onSave={handleProviderAdded}
                 onCancel={() => setProviderType(null)}
               />

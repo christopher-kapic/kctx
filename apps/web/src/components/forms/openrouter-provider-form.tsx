@@ -8,25 +8,34 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { client } from "@/utils/orpc";
 
+function getModelsForDisplay(models: Record<string, unknown> | undefined): string {
+  if (!models) return "";
+  return Object.keys(models).join("\n");
+}
+
 interface OpenRouterProviderFormProps {
+  initialData?: any;
+  providerId?: string;
   onSave: (providerId: string, config: any) => void;
   onCancel: () => void;
 }
 
 export function OpenRouterProviderForm({
+  initialData,
+  providerId: initialProviderId,
   onSave,
   onCancel,
 }: OpenRouterProviderFormProps) {
   const [modelsText, setModelsText] = useState(
-    "anthropic/claude-3.5-sonnet\nanthropic/claude-3-opus",
+    getModelsForDisplay(initialData?.models) || "anthropic/claude-3.5-sonnet\nanthropic/claude-3-opus",
   );
   const [isLoadingModels, setIsLoadingModels] = useState(false);
 
   const form = useForm({
     defaultValues: {
-      providerId: "openrouter",
-      apiKey: "",
-      baseURL: "https://openrouter.ai/api/v1",
+      providerId: initialProviderId || "openrouter",
+      apiKey: initialData?.options?.apiKey || "",
+      baseURL: initialData?.options?.baseURL || "https://openrouter.ai/api/v1",
     },
     onSubmit: async ({ value }) => {
       if (!value.apiKey) {
@@ -94,6 +103,7 @@ export function OpenRouterProviderForm({
               onChange={(e) => field.handleChange(e.target.value)}
               onBlur={field.handleBlur}
               placeholder="openrouter"
+              disabled={!!initialProviderId}
             />
           </div>
         )}

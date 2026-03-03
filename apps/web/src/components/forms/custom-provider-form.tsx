@@ -7,25 +7,36 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
+function getModelsForDisplay(models: Record<string, unknown> | undefined): string {
+  if (!models) return "";
+  return Object.entries(models)
+    .map(([id, meta]: [string, any]) => meta?.name ? `${id}: ${meta.name}` : id)
+    .join("\n");
+}
+
 interface CustomProviderFormProps {
+  initialData?: any;
+  providerId?: string;
   onSave: (providerId: string, config: any) => void;
   onCancel: () => void;
 }
 
 export function CustomProviderForm({
+  initialData,
+  providerId: initialProviderId,
   onSave,
   onCancel,
 }: CustomProviderFormProps) {
-  const [modelsText, setModelsText] = useState("");
+  const [modelsText, setModelsText] = useState(getModelsForDisplay(initialData?.models));
   const [isLoadingModels, setIsLoadingModels] = useState(false);
 
   const form = useForm({
     defaultValues: {
-      providerId: "",
-      npm: "",
-      name: "",
-      baseURL: "",
-      apiKey: "",
+      providerId: initialProviderId || "",
+      npm: initialData?.npm || "",
+      name: initialData?.name || "",
+      baseURL: initialData?.options?.baseURL || "",
+      apiKey: initialData?.options?.apiKey || "",
     },
     onSubmit: async ({ value }) => {
       if (!value.providerId || !value.npm || !value.name) {
@@ -103,6 +114,7 @@ export function CustomProviderForm({
               onChange={(e) => field.handleChange(e.target.value)}
               onBlur={field.handleBlur}
               placeholder="my-provider"
+              disabled={!!initialProviderId}
             />
           </div>
         )}

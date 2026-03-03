@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Trash2, Brain } from "lucide-react";
 import { toast } from "sonner";
 import { AddProviderDialog } from "@/components/add-provider-dialog";
+import { EditProviderDialog } from "@/components/edit-provider-dialog";
 
 export const Route = createFileRoute("/_authenticated/models")({
   component: ModelsComponent,
@@ -151,20 +152,26 @@ function ModelsComponent() {
                               {providerId}
                             </CardDescription>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8 text-destructive hover:text-destructive"
-                            onClick={() => {
-                              if (
-                                confirm(`Delete provider ${providerName}?`)
-                              ) {
-                                handleDeleteProvider(providerId);
-                              }
-                            }}
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
+                          <div className="flex gap-1">
+                            <EditProviderDialog
+                              providerId={providerId}
+                              providerConfig={providerConfig}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-8 text-destructive hover:text-destructive"
+                              onClick={() => {
+                                if (
+                                  confirm(`Delete provider ${providerName}?`)
+                                ) {
+                                  handleDeleteProvider(providerId);
+                                }
+                              }}
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </div>
                         </div>
                       </CardHeader>
                       <CardContent>

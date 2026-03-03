@@ -8,23 +8,34 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { client } from "@/utils/orpc";
 
+function getModelsForDisplay(models: Record<string, unknown> | undefined): string {
+  if (!models) return "";
+  return Object.keys(models).join("\n");
+}
+
 interface OpenCodeZenProviderFormProps {
+  initialData?: any;
+  providerId?: string;
   onSave: (providerId: string, config: any) => void;
   onCancel: () => void;
 }
 
 export function OpenCodeZenProviderForm({
+  initialData,
+  providerId: initialProviderId,
   onSave,
   onCancel,
 }: OpenCodeZenProviderFormProps) {
-  const [modelsText, setModelsText] = useState("gpt-5.2-codex\nclaude-sonnet-4-5");
+  const [modelsText, setModelsText] = useState(
+    getModelsForDisplay(initialData?.models) || "gpt-5.2-codex\nclaude-sonnet-4-5",
+  );
   const [isLoadingModels, setIsLoadingModels] = useState(false);
 
   const form = useForm({
     defaultValues: {
-      providerId: "opencode",
-      apiKey: "",
-      baseURL: "https://opencode.ai/zen/v1",
+      providerId: initialProviderId || "opencode",
+      apiKey: initialData?.options?.apiKey || "",
+      baseURL: initialData?.options?.baseURL || "https://opencode.ai/zen/v1",
     },
     onSubmit: async ({ value }) => {
       if (!value.apiKey) {
@@ -97,6 +108,7 @@ export function OpenCodeZenProviderForm({
               onChange={(e) => field.handleChange(e.target.value)}
               onBlur={field.handleBlur}
               placeholder="opencode"
+              disabled={!!initialProviderId}
             />
           </div>
         )}
