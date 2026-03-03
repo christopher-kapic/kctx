@@ -51,11 +51,18 @@ export async function authenticateApiKey(
 }
 
 async function getSettings() {
-  return prisma.siteSettings.upsert({
+  const settings = await prisma.siteSettings.upsert({
     where: { id: "default" },
     create: { id: "default" },
     update: {},
   });
+
+  // Fall back to OPENCODE_URL env var if not set in database
+  if (!settings.opencodeUrl && env.OPENCODE_URL) {
+    settings.opencodeUrl = env.OPENCODE_URL;
+  }
+
+  return settings;
 }
 
 async function fetchWithTimeout(
@@ -76,9 +83,12 @@ async function fetchWithTimeout(
   } catch (error) {
     clearTimeout(timeoutId);
     if (error instanceof Error && error.name === "AbortError") {
-      throw new Error(`Request timed out after ${timeoutMs}ms`);
+      throw new Error(`Request to ${url} timed out after ${timeoutMs}ms`);
     }
-    throw error;
+    const cause = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Failed to fetch ${url}: ${cause}. Check that the OpenCode service is reachable from the server.`,
+    );
   }
 }
 
@@ -109,6 +119,8 @@ async function queryOpencode(
   timeoutMs: number,
 ): Promise<{ response: string; sessionId: string }> {
   const fetchTimeout = Math.min(timeoutMs, 30000);
+
+  console.log(`[MCP] queryOpencode: url=${opencodeUrl}, repoPath=${repoPath}, timeout=${timeoutMs}ms`);
 
   // Create session
   const sessionRes = await fetchWithTimeout(

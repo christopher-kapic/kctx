@@ -175,7 +175,8 @@ function SiteSettingsCard() {
                     onChange={(e) => field.handleChange(e.target.value)}
                   />
                   <p className="text-xs text-muted-foreground">
-                    URL of the OpenCode service for AI-powered dependency queries
+                    URL of the OpenCode service for AI-powered dependency queries.
+                    Leave blank to use the OPENCODE_URL environment variable.
                   </p>
                 </div>
               )}
