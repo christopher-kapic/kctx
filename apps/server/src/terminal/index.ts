@@ -14,6 +14,13 @@ const sessions = new Map<string, TerminalSession>();
 
 const TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
+// Strip DECRQM (request mode) sequences that crash xterm.js 6.0.0's minified bundle.
+// OpenCode sends these to probe terminal capabilities; it falls back gracefully without responses.
+const DECRQM_RE = /\x1b\[\??\d+\$p/g;
+function sanitizePtyOutput(data: string): string {
+  return data.replace(DECRQM_RE, "");
+}
+
 export function createSession(userId: string, ws: WSContext): string {
   const openCodeUrl = env.OPENCODE_URL ?? "http://opencode:4096";
   console.log(`[terminal] Creating session for user ${userId}`);
@@ -38,8 +45,10 @@ export function createSession(userId: string, ws: WSContext): string {
     const session = sessions.get(sessionId);
     if (session) {
       session.lastActivity = new Date();
-      console.log(`[terminal] PTY data (${data.length} chars): ${JSON.stringify(data.slice(0, 200))}`);
-      session.ws.send(JSON.stringify({ type: "data", content: data }));
+      const sanitized = sanitizePtyOutput(data);
+      if (sanitized.length === 0) return;
+      console.log(`[terminal] PTY data (${sanitized.length} chars): ${JSON.stringify(sanitized.slice(0, 200))}`);
+      session.ws.send(JSON.stringify({ type: "data", content: sanitized }));
     }
   });
 

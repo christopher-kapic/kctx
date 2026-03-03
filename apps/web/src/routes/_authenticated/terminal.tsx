@@ -62,16 +62,23 @@ function TerminalPage() {
     };
 
     ws.onmessage = (event) => {
-      const msg = JSON.parse(event.data);
+      try {
+        const msg = JSON.parse(event.data);
 
-      if (msg.type === "session") {
-        sessionIdRef.current = msg.id;
-      } else if (msg.type === "data") {
-        term.write(msg.content);
-      } else if (msg.type === "exit") {
-        term.writeln(
-          `\r\n\x1b[31mProcess exited with code ${msg.code}\x1b[0m`,
-        );
+        if (msg.type === "session") {
+          console.log("[terminal] Session established:", msg.id);
+          sessionIdRef.current = msg.id;
+        } else if (msg.type === "data") {
+          console.log(`[terminal] Received data (${msg.content.length} chars)`);
+          term.write(msg.content);
+        } else if (msg.type === "exit") {
+          console.log("[terminal] Process exited:", msg.code);
+          term.writeln(
+            `\r\n\x1b[31mProcess exited with code ${msg.code}\x1b[0m`,
+          );
+        }
+      } catch (err) {
+        console.error("[terminal] Failed to handle message:", err, "raw:", event.data.slice(0, 200));
       }
     };
 
