@@ -10,13 +10,68 @@ import { env } from "@kctx/env/server";
 
 import { protectedProcedure } from "../index";
 
+/** Detect the default branch for a cloned repository */
+async function getDefaultBranch(clonedPath: string): Promise<string> {
+  const git = simpleGit(clonedPath);
+
+  // Try symbolic-ref first (most reliable for cloned repos)
+  try {
+    const ref = await git.raw(["symbolic-ref", "refs/remotes/origin/HEAD"]);
+    const branch = ref.trim().replace("refs/remotes/origin/", "");
+    if (branch) return branch;
+  } catch {
+    // Not set
+  }
+
+  // Fallback: git remote show origin
+  try {
+    const info = await git.raw(["remote", "show", "origin"]);
+    const match = info.match(/HEAD branch:\s*(.+)/);
+    if (match?.[1]?.trim()) return match[1].trim();
+  } catch {
+    // Remote unavailable
+  }
+
+  // Fallback: check local branches
+  try {
+    const branches = await git.branchLocal();
+    for (const name of ["main", "master", "develop", "dev"]) {
+      if (branches.all.includes(name)) return name;
+    }
+    if (branches.current) return branches.current;
+  } catch {
+    // No branches
+  }
+
+  return "main";
+}
+
 export const repositoryRouter = {
   list: protectedProcedure.handler(async () => {
     return prisma.repository.findMany({
       orderBy: { createdAt: "desc" },
-      include: { _count: { select: { Packages: true } } },
+      include: {
+        _count: { select: { Packages: true } },
+        Packages: { select: { urls: true }, take: 1 },
+      },
     });
   }),
+
+  getDefaultBranch: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .handler(async ({ input }) => {
+      const repo = await prisma.repository.findUnique({
+        where: { id: input.id },
+      });
+      if (!repo) {
+        throw new ORPCError("NOT_FOUND", { message: "Repository not found" });
+      }
+      if (!repo.clonedPath) {
+        return { defaultBranch: "main" };
+      }
+      const defaultBranch = await getDefaultBranch(repo.clonedPath);
+      return { defaultBranch };
+    }),
 
   get: protectedProcedure
     .input(z.object({ id: z.string() }))
@@ -84,6 +139,8 @@ export const repositoryRouter = {
         sshPrivateKey: input.sshPrivateKey,
       });
 
+      const detectedBranch = await getDefaultBranch(clonedPath);
+
       const repo = await prisma.repository.create({
         data: {
           gitProvider,
@@ -96,7 +153,7 @@ export const repositoryRouter = {
         },
       });
 
-      return repo;
+      return { ...repo, defaultBranch: detectedBranch };
     }),
 
   update: protectedProcedure

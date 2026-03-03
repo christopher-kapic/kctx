@@ -12,6 +12,10 @@ import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
+import sharp from "sharp";
+import { existsSync, mkdirSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import {
   authenticateApiKey,
   createMcpServer,
@@ -49,6 +53,48 @@ app.on(["POST"], "/api/auth/sign-up/*", async (c, next) => {
 });
 
 app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
+
+// Package image upload
+app.post("/api/packages/:id/image", async (c) => {
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  if (!session) return c.json({ error: "Unauthorized" }, 401);
+
+  const packageId = c.req.param("id");
+  const pkg = await prisma.package.findUnique({ where: { id: packageId } });
+  if (!pkg) return c.json({ error: "Package not found" }, 404);
+
+  const body = await c.req.parseBody();
+  const file = body["image"];
+  if (!(file instanceof File)) return c.json({ error: "No image file provided" }, 400);
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const resized = await sharp(buffer)
+    .resize(256, 256, { fit: "inside", withoutEnlargement: true })
+    .png()
+    .toBuffer();
+
+  const imagesDir = join(env.PACKAGES_PATH, "_images");
+  mkdirSync(imagesDir, { recursive: true });
+  await writeFile(join(imagesDir, `${packageId}.png`), resized);
+
+  return c.json({ success: true });
+});
+
+// Package image serve
+app.get("/api/packages/:id/image", async (c) => {
+  const packageId = c.req.param("id");
+  const imagePath = join(env.PACKAGES_PATH, "_images", `${packageId}.png`);
+
+  if (!existsSync(imagePath)) return c.notFound();
+
+  const data = await readFile(imagePath);
+  return c.newResponse(data, {
+    headers: {
+      "Content-Type": "image/png",
+      "Cache-Control": "public, max-age=3600",
+    },
+  });
+});
 
 // MCP Server setup
 const mcpServer = createMcpServer();

@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { z } from "zod";
+import { simpleGit } from "simple-git";
 import prisma from "@kctx/db";
 import { env } from "@kctx/env/server";
 
@@ -220,6 +221,38 @@ async function queryOpencode(
   throw new Error(`OpenCode query timed out after ${timeoutMs}ms`);
 }
 
+async function generateKctxHelperIfNeeded(
+  packageId: string,
+  packageName: string,
+  packageManager: string,
+  repoPath: string,
+  opencodeUrl: string,
+  timeoutMs: number,
+) {
+  try {
+    const pkg = await prisma.package.findUnique({ where: { id: packageId }, select: { kctxHelper: true } });
+    if (pkg?.kctxHelper?.trim()) return;
+
+    const prompt = `You are analyzing a repository for the package "${packageName}" (${packageManager}).
+Provide a concise guide that will help future AI queries about this package be answered faster. Include:
+1. What this package/library does (1-2 sentences)
+2. The key source files and directories most relevant to understanding "${packageName}" — list specific paths
+3. Main exports, entry points, or APIs that users of this package interact with
+4. Important patterns, conventions, or architectural decisions in the codebase
+5. Any configuration files or build setup relevant to this package
+Reply with only the guide text, no preamble or markdown headers.`;
+
+    const result = await queryOpencode(repoPath, prompt, opencodeUrl, timeoutMs * 3);
+
+    await prisma.package.update({
+      where: { id: packageId },
+      data: { kctxHelper: result.response },
+    });
+  } catch {
+    // Fire-and-forget — don't block the main query
+  }
+}
+
 export function createMcpServer(): McpServer {
   const mcpServer = new McpServer(
     {
@@ -331,6 +364,15 @@ export function createMcpServer(): McpServer {
           };
         }
 
+        // Auto-pull for public repos (best-effort)
+        if (!pkg.Repository.isPrivate && pkg.Repository.clonedPath) {
+          try {
+            await simpleGit(pkg.Repository.clonedPath).pull();
+          } catch {
+            // Proceed even if pull fails
+          }
+        }
+
         const settings = await getSettings();
 
         if (!settings.opencodeUrl) {
@@ -349,12 +391,30 @@ export function createMcpServer(): McpServer {
           ? timeout * 1000
           : settings.opencodeTimeoutMs;
 
+        // Prepend kctxHelper as context if available
+        let enrichedQuery = query;
+        if (pkg.kctxHelper?.trim()) {
+          enrichedQuery = `Context about this package:\n${pkg.kctxHelper}\n\n${query}`;
+        }
+
         const result = await queryOpencode(
           pkg.Repository.clonedPath,
-          query,
+          enrichedQuery,
           settings.opencodeUrl,
           timeoutMs,
         );
+
+        // Fire-and-forget: generate helper text if missing
+        if (!pkg.kctxHelper?.trim()) {
+          generateKctxHelperIfNeeded(
+            pkg.id,
+            pkg.identifier,
+            pkg.packageManager,
+            pkg.Repository.clonedPath,
+            settings.opencodeUrl,
+            timeoutMs,
+          );
+        }
 
         return {
           content: [

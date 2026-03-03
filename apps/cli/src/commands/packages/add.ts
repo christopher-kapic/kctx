@@ -8,7 +8,7 @@ export const packagesAddCommand = defineCommand({
   async run() {
     p.intro(pc.bgCyan(pc.black(" Add Package ")));
 
-    const values = await p.group(
+    const initialValues = await p.group(
       {
         identifier: () =>
           p.text({
@@ -43,18 +43,6 @@ export const packagesAddCommand = defineCommand({
           }),
         isPrivate: () =>
           p.confirm({ message: "Is this a private repository?", initialValue: false }),
-        defaultTag: () =>
-          p.text({
-            message: "Default tag/branch",
-            defaultValue: "main",
-            placeholder: "main",
-          }),
-        kctxHelper: () =>
-          p.text({
-            message: "Helper text (optional)",
-            defaultValue: "",
-            placeholder: "Optional description for AI tools",
-          }),
       },
       {
         onCancel: () => {
@@ -63,12 +51,6 @@ export const packagesAddCommand = defineCommand({
         },
       },
     );
-
-    const confirmed = await p.confirm({ message: "Create this package?" });
-    if (p.isCancel(confirmed) || !confirmed) {
-      p.cancel("Cancelled.");
-      return;
-    }
 
     const s = p.spinner();
 
@@ -79,7 +61,7 @@ export const packagesAddCommand = defineCommand({
       const existingRepo = repos.find(
         (r) => {
           try {
-            const url = new URL(values.gitUrl as string);
+            const url = new URL(initialValues.gitUrl as string);
             const parts = url.pathname.split("/").filter(Boolean);
             return r.orgOrUser === parts[0] && r.repoName === parts[1]?.replace(/\.git$/, "");
           } catch {
@@ -89,31 +71,71 @@ export const packagesAddCommand = defineCommand({
       );
 
       let repoId: string;
+      let detectedBranch = "main";
 
       if (!existingRepo) {
         s.stop("Repository not found, cloning...");
         const s2 = p.spinner();
         s2.start("Cloning repository (this may take a moment)...");
         const newRepo = await client.repository.create({
-          gitUrl: values.gitUrl as string,
-          isPrivate: values.isPrivate as boolean,
-          authMethod: (values.isPrivate as boolean) ? "SSH" : "HTTPS",
+          gitUrl: initialValues.gitUrl as string,
+          isPrivate: initialValues.isPrivate as boolean,
+          authMethod: (initialValues.isPrivate as boolean) ? "SSH" : "HTTPS",
         });
         s2.stop("Repository cloned!");
         repoId = newRepo.id;
+        if ("defaultBranch" in newRepo && typeof newRepo.defaultBranch === "string") {
+          detectedBranch = newRepo.defaultBranch;
+        }
       } else {
         s.stop("Found existing repository.");
         repoId = existingRepo.id;
+        try {
+          const result = await client.repository.getDefaultBranch({ id: repoId });
+          if (result.defaultBranch) detectedBranch = result.defaultBranch;
+        } catch {
+          // Use fallback
+        }
+      }
+
+      // Prompt for remaining fields now that we know the default branch
+      const extraValues = await p.group(
+        {
+          defaultTag: () =>
+            p.text({
+              message: "Default branch",
+              defaultValue: detectedBranch,
+              placeholder: detectedBranch,
+            }),
+          kctxHelper: () =>
+            p.text({
+              message: "Helper text (optional)",
+              defaultValue: "",
+              placeholder: "Optional description for AI tools",
+            }),
+        },
+        {
+          onCancel: () => {
+            p.cancel("Cancelled.");
+            process.exit(0);
+          },
+        },
+      );
+
+      const confirmed = await p.confirm({ message: "Create this package?" });
+      if (p.isCancel(confirmed) || !confirmed) {
+        p.cancel("Cancelled.");
+        return;
       }
 
       const s3 = p.spinner();
       s3.start("Creating package...");
       const pkg = await client.package.create({
-        identifier: values.identifier as string,
-        displayName: (values.displayName || values.identifier) as string,
-        packageManager: values.packageManager as string,
-        defaultTag: (values.defaultTag || "main") as string,
-        kctxHelper: (values.kctxHelper as string) || undefined,
+        identifier: initialValues.identifier as string,
+        displayName: (initialValues.displayName || initialValues.identifier) as string,
+        packageManager: initialValues.packageManager as string,
+        defaultTag: (extraValues.defaultTag || detectedBranch) as string,
+        kctxHelper: (extraValues.kctxHelper as string) || undefined,
         urls: {},
         repositoryId: repoId,
       });

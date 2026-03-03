@@ -1,8 +1,8 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useForm } from "@tanstack/react-form";
-import { Pencil, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Pencil, Plus, Trash2, Upload } from "lucide-react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import z from "zod";
 
@@ -53,12 +53,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { client, orpc, queryClient } from "@/utils/orpc";
+import { env } from "@kctx/env/web";
 
 export const Route = createFileRoute("/_authenticated/packages")({
   component: PackagesPage,
 });
 
 const PACKAGE_MANAGERS = ["npm", "pip", "cargo", "go", "gem", "maven", "other"];
+
+const baseURL =
+  env.VITE_SERVER_URL ??
+  (typeof window !== "undefined" ? window.location.origin : "");
+
+function getImageUrl(packageId: string) {
+  return `${baseURL}/api/packages/${packageId}/image`;
+}
 
 type PackageItem = {
   id: string;
@@ -76,6 +85,40 @@ type PackageItem = {
   } | null;
 };
 
+function parseUrls(urls: unknown): { gitBrowser: string; website: string; docs: string } {
+  const obj = (typeof urls === "object" && urls !== null ? urls : {}) as Record<string, string>;
+  return {
+    gitBrowser: obj.gitBrowser ?? "",
+    website: obj.website ?? "",
+    docs: obj.docs ?? "",
+  };
+}
+
+function buildUrls(gitBrowser: string, website: string, docs: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  if (gitBrowser.trim()) result.gitBrowser = gitBrowser.trim();
+  if (website.trim()) result.website = website.trim();
+  if (docs.trim()) result.docs = docs.trim();
+  return result;
+}
+
+function PackageImage({ packageId, size = 24 }: { packageId: string; size?: number }) {
+  const [hasError, setHasError] = useState(false);
+
+  if (hasError) return null;
+
+  return (
+    <img
+      src={getImageUrl(packageId)}
+      alt=""
+      width={size}
+      height={size}
+      className="rounded object-contain"
+      onError={() => setHasError(true)}
+    />
+  );
+}
+
 function TableSkeleton() {
   return (
     <div className="rounded border">
@@ -86,7 +129,7 @@ function TableSkeleton() {
             <TableHead>Identifier</TableHead>
             <TableHead>Package Manager</TableHead>
             <TableHead>Repository</TableHead>
-            <TableHead>Default Tag</TableHead>
+            <TableHead>Default Branch</TableHead>
             <TableHead className="w-20" />
           </TableRow>
         </TableHeader>
@@ -109,6 +152,7 @@ function TableSkeleton() {
 
 function CreatePackageDialog() {
   const [open, setOpen] = useState(false);
+  const [defaultBranchEdited, setDefaultBranchEdited] = useState(false);
 
   const reposQuery = useQuery({
     ...orpc.repository.list.queryOptions({}),
@@ -132,27 +176,44 @@ function CreatePackageDialog() {
       packageManager: "npm",
       gitUrl: "",
       isPrivate: false,
-      defaultTag: "latest",
+      defaultTag: "",
       kctxHelper: "",
+      gitBrowser: "",
+      website: "",
+      docs: "",
     },
     onSubmit: async ({ value }) => {
       try {
-        // Check if repo with this git URL already exists
         const repos = reposQuery.data ?? [];
         let repositoryId: string | undefined;
 
         const existing = repos.find((r) => r.gitUrl === value.gitUrl);
         if (existing) {
           repositoryId = existing.id;
+          // Detect default branch for existing repo if not manually edited
+          if (!defaultBranchEdited && !value.defaultTag) {
+            try {
+              const { defaultBranch } = await client.repository.getDefaultBranch({ id: existing.id });
+              form.setFieldValue("defaultTag", defaultBranch);
+              value.defaultTag = defaultBranch;
+            } catch {
+              value.defaultTag = "main";
+            }
+          }
         } else {
-          // Create new repository (will clone it)
           const newRepo = await createRepoMutation.mutateAsync({
             gitUrl: value.gitUrl,
             isPrivate: value.isPrivate,
             authMethod: value.isPrivate ? "SSH" : "HTTPS",
           });
           repositoryId = newRepo.id;
+          // Use default branch from clone result if not manually edited
+          if (!defaultBranchEdited && !value.defaultTag && "defaultBranch" in newRepo) {
+            value.defaultTag = (newRepo as { defaultBranch: string }).defaultBranch;
+          }
         }
+
+        if (!value.defaultTag) value.defaultTag = "main";
 
         await createPackageMutation.mutateAsync({
           identifier: value.identifier,
@@ -160,7 +221,7 @@ function CreatePackageDialog() {
           packageManager: value.packageManager,
           defaultTag: value.defaultTag,
           kctxHelper: value.kctxHelper || undefined,
-          urls: {},
+          urls: buildUrls(value.gitBrowser, value.website, value.docs),
           repositoryId,
         });
 
@@ -169,6 +230,7 @@ function CreatePackageDialog() {
         queryClient.invalidateQueries({ queryKey: orpc.repository.list.queryOptions({}).queryKey });
         setOpen(false);
         form.reset();
+        setDefaultBranchEdited(false);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Failed to create package");
       }
@@ -180,8 +242,11 @@ function CreatePackageDialog() {
         packageManager: z.string().min(1, "Package manager is required"),
         gitUrl: z.string().url("Must be a valid URL"),
         isPrivate: z.boolean(),
-        defaultTag: z.string().min(1, "Default tag is required"),
+        defaultTag: z.string(),
         kctxHelper: z.string(),
+        gitBrowser: z.string(),
+        website: z.string(),
+        docs: z.string(),
       }),
     },
   });
@@ -281,7 +346,27 @@ function CreatePackageDialog() {
                   placeholder="https://github.com/user/repo"
                   value={field.state.value}
                   onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
+                  onChange={(e) => {
+                    const gitUrl = e.target.value;
+                    field.handleChange(gitUrl);
+
+                    // Auto-compute gitBrowser from HTTPS URL
+                    if (gitUrl.startsWith("https://")) {
+                      form.setFieldValue("gitBrowser", gitUrl.replace(/\.git$/, ""));
+                    }
+
+                    // Prefill from existing repo's sibling packages
+                    const repos = reposQuery.data ?? [];
+                    const matchingRepo = repos.find((r) => r.gitUrl === gitUrl);
+                    if (matchingRepo && "Packages" in matchingRepo) {
+                      const packages = (matchingRepo as { Packages: Array<{ urls: unknown }> }).Packages;
+                      if (packages?.[0]?.urls) {
+                        const siblingUrls = parseUrls(packages[0].urls);
+                        if (siblingUrls.website) form.setFieldValue("website", siblingUrls.website);
+                        if (siblingUrls.docs) form.setFieldValue("docs", siblingUrls.docs);
+                      }
+                    }
+                  }}
                 />
                 <p className="text-xs text-muted-foreground">
                   If a repository with this URL exists, it will be linked. Otherwise a new repo will be cloned.
@@ -315,19 +400,76 @@ function CreatePackageDialog() {
           <form.Field name="defaultTag">
             {(field) => (
               <div className="space-y-1.5">
-                <Label htmlFor={field.name}>Default Tag</Label>
+                <Label htmlFor={field.name}>Default Branch</Label>
                 <Input
                   id={field.name}
-                  placeholder="e.g. latest, stable, v1"
+                  placeholder="Auto-detected after clone"
                   value={field.state.value}
                   onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
+                  onChange={(e) => {
+                    field.handleChange(e.target.value);
+                    setDefaultBranchEdited(true);
+                  }}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Leave empty to auto-detect from the repository.
+                </p>
                 {field.state.meta.errors.map((error) => (
                   <p key={error?.message} className="text-xs text-destructive">
                     {error?.message}
                   </p>
                 ))}
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field name="gitBrowser">
+            {(field) => (
+              <div className="space-y-1.5">
+                <Label htmlFor={field.name}>
+                  Git Browser URL <span className="text-muted-foreground">(optional)</span>
+                </Label>
+                <Input
+                  id={field.name}
+                  placeholder="https://github.com/user/repo"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field name="website">
+            {(field) => (
+              <div className="space-y-1.5">
+                <Label htmlFor={field.name}>
+                  Website <span className="text-muted-foreground">(optional)</span>
+                </Label>
+                <Input
+                  id={field.name}
+                  placeholder="https://example.com"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field name="docs">
+            {(field) => (
+              <div className="space-y-1.5">
+                <Label htmlFor={field.name}>
+                  Documentation <span className="text-muted-foreground">(optional)</span>
+                </Label>
+                <Input
+                  id={field.name}
+                  placeholder="https://docs.example.com"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
               </div>
             )}
           </form.Field>
@@ -368,6 +510,74 @@ function CreatePackageDialog() {
   );
 }
 
+function ImageUpload({ packageId }: { packageId: string }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  return (
+    <div className="space-y-2">
+      <Label>Package Image</Label>
+      <div className="flex items-center gap-3">
+        <div className="flex size-16 items-center justify-center rounded border bg-muted">
+          {preview ? (
+            <img src={preview} alt="Preview" className="size-16 rounded object-contain" />
+          ) : (
+            <PackageImage packageId={packageId} size={64} />
+          )}
+        </div>
+        <div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+
+              setPreview(URL.createObjectURL(file));
+              setUploading(true);
+
+              const formData = new FormData();
+              formData.append("image", file);
+
+              try {
+                const res = await fetch(getImageUrl(packageId), {
+                  method: "POST",
+                  body: formData,
+                  credentials: "include",
+                });
+                if (!res.ok) throw new Error("Upload failed");
+                toast.success("Image uploaded");
+                queryClient.invalidateQueries({ queryKey: orpc.package.list.queryOptions({}).queryKey });
+              } catch {
+                toast.error("Failed to upload image");
+                setPreview(null);
+              } finally {
+                setUploading(false);
+              }
+            }}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={uploading}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload className="mr-1.5 size-3.5" />
+            {uploading ? "Uploading..." : "Upload Image"}
+          </Button>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Resized to 256x256 max
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EditPackageSheet({
   pkg,
   open,
@@ -395,38 +605,34 @@ function EditPackageSheet({
     },
   });
 
+  const existingUrls = parseUrls(pkg.urls);
+
   const form = useForm({
     defaultValues: {
       displayName: pkg.displayName,
       defaultTag: pkg.defaultTag,
       kctxHelper: pkg.kctxHelper ?? "",
-      urls: JSON.stringify(pkg.urls ?? {}, null, 2),
+      gitBrowser: existingUrls.gitBrowser,
+      website: existingUrls.website,
+      docs: existingUrls.docs,
     },
     onSubmit: async ({ value }) => {
-      let parsedUrls: Record<string, string> = {};
-      if (value.urls.trim()) {
-        try {
-          parsedUrls = JSON.parse(value.urls);
-        } catch {
-          toast.error("URLs must be valid JSON");
-          return;
-        }
-      }
-
       updateMutation.mutate({
         id: pkg.id,
         displayName: value.displayName,
         defaultTag: value.defaultTag,
         kctxHelper: value.kctxHelper || null,
-        urls: parsedUrls,
+        urls: buildUrls(value.gitBrowser, value.website, value.docs),
       });
     },
     validators: {
       onSubmit: z.object({
         displayName: z.string().min(1, "Display name is required"),
-        defaultTag: z.string().min(1, "Default tag is required"),
+        defaultTag: z.string().min(1, "Default branch is required"),
         kctxHelper: z.string(),
-        urls: z.string(),
+        gitBrowser: z.string(),
+        website: z.string(),
+        docs: z.string(),
       }),
     },
   });
@@ -448,6 +654,8 @@ function EditPackageSheet({
           }}
           className="flex flex-1 flex-col gap-4 overflow-y-auto p-4"
         >
+          <ImageUpload packageId={pkg.id} />
+
           <form.Field name="displayName">
             {(field) => (
               <div className="space-y-1.5">
@@ -470,7 +678,7 @@ function EditPackageSheet({
           <form.Field name="defaultTag">
             {(field) => (
               <div className="space-y-1.5">
-                <Label htmlFor="edit-defaultTag">Default Tag</Label>
+                <Label htmlFor="edit-defaultTag">Default Branch</Label>
                 <Input
                   id="edit-defaultTag"
                   value={field.state.value}
@@ -482,6 +690,57 @@ function EditPackageSheet({
                     {error?.message}
                   </p>
                 ))}
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field name="gitBrowser">
+            {(field) => (
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-gitBrowser">
+                  Git Browser URL <span className="text-muted-foreground">(optional)</span>
+                </Label>
+                <Input
+                  id="edit-gitBrowser"
+                  placeholder="https://github.com/user/repo"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field name="website">
+            {(field) => (
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-website">
+                  Website <span className="text-muted-foreground">(optional)</span>
+                </Label>
+                <Input
+                  id="edit-website"
+                  placeholder="https://example.com"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field name="docs">
+            {(field) => (
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-docs">
+                  Documentation <span className="text-muted-foreground">(optional)</span>
+                </Label>
+                <Input
+                  id="edit-docs"
+                  placeholder="https://docs.example.com"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
               </div>
             )}
           </form.Field>
@@ -499,26 +758,6 @@ function EditPackageSheet({
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
                 />
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field name="urls">
-            {(field) => (
-              <div className="space-y-1.5">
-                <Label htmlFor="edit-urls">
-                  URLs <span className="text-muted-foreground">(JSON)</span>
-                </Label>
-                <textarea
-                  id="edit-urls"
-                  className="flex min-h-20 w-full rounded border bg-transparent px-3 py-2 font-mono text-xs shadow-xs outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Key-value pairs, e.g. {`{"docs": "https://..."}`}
-                </p>
               </div>
             )}
           </form.Field>
@@ -644,7 +883,7 @@ function PackagesPage() {
                 <TableHead>Identifier</TableHead>
                 <TableHead>Package Manager</TableHead>
                 <TableHead>Repository</TableHead>
-                <TableHead>Default Tag</TableHead>
+                <TableHead>Default Branch</TableHead>
                 <TableHead className="w-20" />
               </TableRow>
             </TableHeader>
@@ -652,7 +891,10 @@ function PackagesPage() {
               {packagesQuery.data.map((pkg) => (
                 <TableRow key={pkg.id}>
                   <TableCell className="font-medium">
-                    {pkg.displayName}
+                    <div className="flex items-center gap-2">
+                      <PackageImage packageId={pkg.id} size={24} />
+                      {pkg.displayName}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
@@ -663,7 +905,7 @@ function PackagesPage() {
                   <TableCell className="text-muted-foreground">
                     {pkg.Repository
                       ? `${pkg.Repository.orgOrUser}/${pkg.Repository.repoName}`
-                      : "—"}
+                      : "\u2014"}
                   </TableCell>
                   <TableCell>{pkg.defaultTag}</TableCell>
                   <TableCell>

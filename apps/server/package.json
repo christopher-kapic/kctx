@@ -24,6 +24,8 @@
     "better-auth": "catalog:",
     "dotenv": "catalog:",
     "hono": "catalog:",
+    "sharp": "^0.33.0",
+    "simple-git": "^3.32.3",
     "zod": "catalog:"
   },
   "devDependencies": {

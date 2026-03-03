@@ -36,7 +36,8 @@
       "@prisma/engines",
       "prisma",
       "esbuild",
-      "@libsql/linux-x64-gnu"
+      "@libsql/linux-x64-gnu",
+      "sharp"
     ]
   }
 }
