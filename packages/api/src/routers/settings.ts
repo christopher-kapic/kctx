@@ -34,7 +34,7 @@ export const settingsRouter = {
         sshCloningEnabled: z.boolean().optional(),
         signupsEnabled: z.boolean().optional(),
         opencodeUrl: z.string().optional(),
-        opencodeTimeoutMs: z.number().int().positive().optional(),
+        opencodeTimeoutMs: z.number().int().positive().max(900000).optional(),
       }),
     )
     .handler(async ({ input }) => {

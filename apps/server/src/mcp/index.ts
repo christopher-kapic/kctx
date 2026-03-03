@@ -158,7 +158,7 @@ async function queryOpencode(
   console.log(`[MCP] queryOpencode: url=${opencodeUrl}, repoPath=${repoPath}, timeout=${timeoutMs}ms`);
 
   const client = createClient(opencodeUrl, repoPath);
-  const fetchTimeout = Math.min(timeoutMs, 30000);
+  const fetchTimeout = Math.min(timeoutMs, 900000);
 
   // Create session
   const sessionResult = await withTimeout(

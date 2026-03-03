@@ -83,13 +83,13 @@ function SiteSettingsCard() {
   const form = useForm({
     defaultValues: {
       opencodeUrl: settingsQuery.data?.opencodeUrl ?? "",
-      opencodeTimeoutMs: String(settingsQuery.data?.opencodeTimeoutMs ?? 30000),
+      opencodeTimeoutSeconds: String((settingsQuery.data?.opencodeTimeoutMs ?? 30000) / 1000),
     },
     onSubmit: async ({ value }) => {
-      const timeoutMs = parseInt(value.opencodeTimeoutMs, 10);
+      const timeoutSeconds = parseFloat(value.opencodeTimeoutSeconds);
       updateMutation.mutate({
         opencodeUrl: value.opencodeUrl || undefined,
-        opencodeTimeoutMs: isNaN(timeoutMs) ? undefined : timeoutMs,
+        opencodeTimeoutMs: isNaN(timeoutSeconds) ? undefined : Math.round(timeoutSeconds * 1000),
       });
     },
   });
@@ -182,20 +182,20 @@ function SiteSettingsCard() {
               )}
             </form.Field>
 
-            <form.Field name="opencodeTimeoutMs">
+            <form.Field name="opencodeTimeoutSeconds">
               {(field) => (
                 <div className="space-y-1.5">
-                  <Label htmlFor={field.name}>OpenCode Timeout (ms)</Label>
+                  <Label htmlFor={field.name}>OpenCode Timeout (seconds)</Label>
                   <Input
                     id={field.name}
                     type="number"
-                    placeholder="30000"
+                    placeholder="30"
                     value={field.state.value}
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.value)}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Timeout in milliseconds for OpenCode queries
+                    Timeout in seconds for OpenCode queries (max 900)
                   </p>
                 </div>
               )}
