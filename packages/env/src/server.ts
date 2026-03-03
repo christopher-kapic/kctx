@@ -9,6 +9,7 @@ export const env = createEnv({
     BETTER_AUTH_URL: z.url().optional(),
     CORS_ORIGIN: z.url().optional(),
     PACKAGES_PATH: z.string().default("/packages"),
+    OPENCODE_CONFIG_PATH: z.string().default("/config/opencode.json"),
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   },
   runtimeEnv: process.env,

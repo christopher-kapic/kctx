@@ -2,8 +2,11 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { z } from "zod";
 import prisma from "@kctx/db";
+import { env } from "@kctx/env/server";
 
 export interface McpContext {
   userId: string;
@@ -78,6 +81,26 @@ async function fetchWithTimeout(
   }
 }
 
+async function getModelFromConfig(): Promise<
+  { providerID: string; modelID: string } | undefined
+> {
+  try {
+    const configPath = env.OPENCODE_CONFIG_PATH;
+    if (!existsSync(configPath)) return undefined;
+    const content = await readFile(configPath, "utf-8");
+    const config = JSON.parse(content);
+    const model = config?.model;
+    if (typeof model !== "string" || !model.includes("/")) return undefined;
+    const slashIndex = model.indexOf("/");
+    return {
+      providerID: model.slice(0, slashIndex),
+      modelID: model.slice(slashIndex + 1),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 async function queryOpencode(
   repoPath: string,
   query: string,
@@ -110,7 +133,17 @@ async function queryOpencode(
     throw new Error("OpenCode session creation returned no session ID");
   }
 
+  // Read configured model
+  const model = await getModelFromConfig();
+
   // Send prompt
+  const promptBody: Record<string, unknown> = {
+    parts: [{ type: "text", text: query }],
+  };
+  if (model) {
+    promptBody.model = model;
+  }
+
   const promptRes = await fetchWithTimeout(
     `${opencodeUrl}/session/${encodeURIComponent(sessionId)}/prompt`,
     {
@@ -119,9 +152,7 @@ async function queryOpencode(
         "Content-Type": "application/json",
         "x-opencode-directory": repoPath,
       },
-      body: JSON.stringify({
-        parts: [{ type: "text", text: query }],
-      }),
+      body: JSON.stringify(promptBody),
     },
     fetchTimeout,
   );

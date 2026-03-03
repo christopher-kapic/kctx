@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedRepositoriesRouteImport } from './routes/_authenticated/repositories'
 import { Route as AuthenticatedPackagesRouteImport } from './routes/_authenticated/packages'
+import { Route as AuthenticatedModelsRouteImport } from './routes/_authenticated/models'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedApiKeysRouteImport } from './routes/_authenticated/api-keys'
 
@@ -48,6 +49,11 @@ const AuthenticatedPackagesRoute = AuthenticatedPackagesRouteImport.update({
   path: '/packages',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedModelsRoute = AuthenticatedModelsRouteImport.update({
+  id: '/models',
+  path: '/models',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -64,6 +70,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/api-keys': typeof AuthenticatedApiKeysRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/models': typeof AuthenticatedModelsRoute
   '/packages': typeof AuthenticatedPackagesRoute
   '/repositories': typeof AuthenticatedRepositoriesRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -73,6 +80,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/api-keys': typeof AuthenticatedApiKeysRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/models': typeof AuthenticatedModelsRoute
   '/packages': typeof AuthenticatedPackagesRoute
   '/repositories': typeof AuthenticatedRepositoriesRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -84,6 +92,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_authenticated/api-keys': typeof AuthenticatedApiKeysRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/models': typeof AuthenticatedModelsRoute
   '/_authenticated/packages': typeof AuthenticatedPackagesRoute
   '/_authenticated/repositories': typeof AuthenticatedRepositoriesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
@@ -95,6 +104,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/api-keys'
     | '/dashboard'
+    | '/models'
     | '/packages'
     | '/repositories'
     | '/settings'
@@ -104,6 +114,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/api-keys'
     | '/dashboard'
+    | '/models'
     | '/packages'
     | '/repositories'
     | '/settings'
@@ -114,6 +125,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/_authenticated/api-keys'
     | '/_authenticated/dashboard'
+    | '/_authenticated/models'
     | '/_authenticated/packages'
     | '/_authenticated/repositories'
     | '/_authenticated/settings'
@@ -169,6 +181,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPackagesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/models': {
+      id: '/_authenticated/models'
+      path: '/models'
+      fullPath: '/models'
+      preLoaderRoute: typeof AuthenticatedModelsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -189,6 +208,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteChildren {
   AuthenticatedApiKeysRoute: typeof AuthenticatedApiKeysRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedModelsRoute: typeof AuthenticatedModelsRoute
   AuthenticatedPackagesRoute: typeof AuthenticatedPackagesRoute
   AuthenticatedRepositoriesRoute: typeof AuthenticatedRepositoriesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
@@ -197,6 +217,7 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedApiKeysRoute: AuthenticatedApiKeysRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedModelsRoute: AuthenticatedModelsRoute,
   AuthenticatedPackagesRoute: AuthenticatedPackagesRoute,
   AuthenticatedRepositoriesRoute: AuthenticatedRepositoriesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,

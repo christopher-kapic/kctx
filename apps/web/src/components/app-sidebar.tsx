@@ -1,6 +1,7 @@
 import { Link, useMatchRoute, useNavigate } from "@tanstack/react-router";
 import {
   BarChart3,
+  Brain,
   Key,
   LogOut,
   Package,
@@ -23,6 +24,7 @@ const navItems = [
 ] as const;
 
 const adminNavItems = [
+  { to: "/models", label: "Models", icon: Brain },
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 

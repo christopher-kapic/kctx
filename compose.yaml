@@ -21,12 +21,14 @@ services:
     volumes:
       - packages:/packages
       - kctx-data:/data
+      - opencode-config:/config
     environment:
       - NODE_ENV=production
       - DATABASE_URL=file:/data/kctx.db
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env (min 32 chars)}
       - PACKAGES_PATH=/packages
       - OPENCODE_URL=http://opencode:4096
+      - OPENCODE_CONFIG_PATH=/config/opencode.json
     depends_on:
       - opencode
     restart: unless-stopped

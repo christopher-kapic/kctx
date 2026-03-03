@@ -7,6 +7,7 @@ import { settingsRouter } from "./settings";
 import { usersRouter } from "./users";
 import { statsRouter } from "./stats";
 import { apiKeyRouter } from "./apiKey";
+import { modelsRouter } from "./models";
 
 export const appRouter = {
   healthCheck: publicProcedure.handler(() => {
@@ -24,6 +25,7 @@ export const appRouter = {
   users: usersRouter,
   stats: statsRouter,
   apiKey: apiKeyRouter,
+  models: modelsRouter,
 };
 export type AppRouter = typeof appRouter;
 export type AppRouterClient = RouterClient<typeof appRouter>;
