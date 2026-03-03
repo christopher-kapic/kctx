@@ -11,5 +11,5 @@ const prisma = new PrismaClient({ adapter });
 
 export default prisma;
 
-export { AuthMethod } from "../prisma/generated/enums";
-export type { AuthMethod as AuthMethodType } from "../prisma/generated/enums";
+export { AuthMethod, CloneStatus } from "../prisma/generated/enums";
+export type { AuthMethod as AuthMethodType, CloneStatus as CloneStatusType } from "../prisma/generated/enums";

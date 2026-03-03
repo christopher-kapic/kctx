@@ -132,15 +132,7 @@ export const repositoryRouter = {
         repoName,
       );
 
-      // Clone the repo
-      await cloneRepository({
-        gitUrl: input.gitUrl,
-        clonedPath,
-        sshPrivateKey: input.sshPrivateKey,
-      });
-
-      const detectedBranch = await getDefaultBranch(clonedPath);
-
+      // Create the DB record immediately with CLONING status
       const repo = await prisma.repository.create({
         data: {
           gitProvider,
@@ -150,10 +142,38 @@ export const repositoryRouter = {
           isPrivate: input.isPrivate,
           authMethod: input.authMethod,
           clonedPath,
+          cloneStatus: "CLONING",
         },
       });
 
-      return { ...repo, defaultBranch: detectedBranch };
+      // Clone in the background (fire-and-forget)
+      const sshPrivateKey = input.sshPrivateKey;
+      cloneRepository({
+        gitUrl: input.gitUrl,
+        clonedPath,
+        sshPrivateKey,
+      })
+        .then(async () => {
+          const detectedBranch = await getDefaultBranch(clonedPath);
+          await prisma.repository.update({
+            where: { id: repo.id },
+            data: { cloneStatus: "READY" },
+          });
+          // Update default branch on all linked packages
+          await prisma.package.updateMany({
+            where: { repositoryId: repo.id },
+            data: { defaultTag: detectedBranch },
+          });
+        })
+        .catch(async (error) => {
+          console.error(`Background clone failed for ${repo.id}:`, error);
+          await prisma.repository.update({
+            where: { id: repo.id },
+            data: { cloneStatus: "FAILED" },
+          });
+        });
+
+      return repo;
     }),
 
   update: protectedProcedure

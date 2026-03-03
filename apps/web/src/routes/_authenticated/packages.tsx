@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useForm } from "@tanstack/react-form";
-import { Pencil, Plus, Trash2, Upload } from "lucide-react";
+import { Loader2, Pencil, Plus, Trash2, Upload, AlertCircle } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import z from "zod";
@@ -82,6 +82,7 @@ type PackageItem = {
     gitProvider: string;
     orgOrUser: string;
     repoName: string;
+    cloneStatus: string;
   } | null;
 };
 
@@ -207,9 +208,10 @@ function CreatePackageDialog() {
             authMethod: value.isPrivate ? "SSH" : "HTTPS",
           });
           repositoryId = newRepo.id;
-          // Use default branch from clone result if not manually edited
-          if (!defaultBranchEdited && !value.defaultTag && "defaultBranch" in newRepo) {
-            value.defaultTag = (newRepo as { defaultBranch: string }).defaultBranch;
+          // Repo is cloning in background; use "main" as placeholder
+          // The default branch will be auto-updated when cloning finishes
+          if (!defaultBranchEdited && !value.defaultTag) {
+            value.defaultTag = "main";
           }
         }
 
@@ -850,7 +852,16 @@ function DeletePackageDialog({
 }
 
 function PackagesPage() {
-  const packagesQuery = useQuery(orpc.package.list.queryOptions({}));
+  const packagesQuery = useQuery({
+    ...orpc.package.list.queryOptions({}),
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      const hasCloning = data?.some(
+        (pkg) => pkg.Repository?.cloneStatus === "CLONING" || pkg.Repository?.cloneStatus === "PENDING",
+      );
+      return hasCloning ? 2000 : false;
+    },
+  });
   const [editPkg, setEditPkg] = useState<PackageItem | null>(null);
   const [deletePkg, setDeletePkg] = useState<PackageItem | null>(null);
 
@@ -903,9 +914,25 @@ function PackagesPage() {
                   </TableCell>
                   <TableCell>{pkg.packageManager}</TableCell>
                   <TableCell className="text-muted-foreground">
-                    {pkg.Repository
-                      ? `${pkg.Repository.orgOrUser}/${pkg.Repository.repoName}`
-                      : "\u2014"}
+                    {pkg.Repository ? (
+                      <div className="flex items-center gap-1.5">
+                        {pkg.Repository.cloneStatus === "CLONING" || pkg.Repository.cloneStatus === "PENDING" ? (
+                          <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
+                        ) : pkg.Repository.cloneStatus === "FAILED" ? (
+                          <AlertCircle className="size-3.5 text-destructive" />
+                        ) : null}
+                        <span>
+                          {`${pkg.Repository.orgOrUser}/${pkg.Repository.repoName}`}
+                          {pkg.Repository.cloneStatus === "CLONING" || pkg.Repository.cloneStatus === "PENDING"
+                            ? " (Cloning...)"
+                            : pkg.Repository.cloneStatus === "FAILED"
+                              ? " (Clone failed)"
+                              : ""}
+                        </span>
+                      </div>
+                    ) : (
+                      "\u2014"
+                    )}
                   </TableCell>
                   <TableCell>{pkg.defaultTag}</TableCell>
                   <TableCell>
