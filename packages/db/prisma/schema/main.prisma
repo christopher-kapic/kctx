@@ -41,7 +41,49 @@ model Package {
   repositoryId   String
   Repository     Repository @relation(fields: [repositoryId], references: [id], onDelete: Restrict)
 
+  Conversations Conversation[]
+
   @@index([repositoryId])
+}
+
+model Conversation {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  title     String   @default("New Conversation")
+  packageId String
+  Package   Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  ownerId   String
+  User      User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  messages  ChatMessage[]
+  shares    ConversationShare[]
+
+  @@index([ownerId])
+  @@index([packageId])
+}
+
+model ChatMessage {
+  id             String       @id @default(cuid())
+  createdAt      DateTime     @default(now())
+  role           String
+  content        String
+  thinking       String?
+  conversationId String
+  Conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+}
+
+model ConversationShare {
+  id             String       @id @default(cuid())
+  createdAt      DateTime     @default(now())
+  conversationId String
+  Conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sharedWithId   String
+  User           User         @relation(fields: [sharedWithId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, sharedWithId])
+  @@index([sharedWithId])
 }
 
 model SiteSettings {

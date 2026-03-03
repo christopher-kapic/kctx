@@ -13,6 +13,8 @@ model User {
   sessions      Session[]
   accounts      Account[]
   ApiKeys       ApiKey[]
+  Conversations Conversation[]
+  SharedWith    ConversationShare[]
 
   @@unique([email])
   @@map("user")

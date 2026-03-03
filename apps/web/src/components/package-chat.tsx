@@ -1,8 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { orpc } from "@/utils/orpc";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
+import { orpc, queryClient } from "@/utils/orpc";
 import { ChatMessage } from "@/components/chat-message";
 import { ChatInput } from "@/components/chat-input";
+import { ChatHistorySelector } from "@/components/chat-history-selector";
+import { ShareConversationDialog } from "@/components/share-conversation-dialog";
+import { ChatTypingIndicator } from "@/components/chat-typing-indicator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -26,12 +30,19 @@ interface Message {
 
 interface PackageChatProps {
   packageIdentifier: string;
+  initialConversationId?: string;
 }
 
-export function PackageChat({ packageIdentifier }: PackageChatProps) {
+export function PackageChat({
+  packageIdentifier,
+  initialConversationId,
+}: PackageChatProps) {
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedModel, setSelectedModel] = useState<string | undefined>();
-  const [conversationId, setConversationId] = useState<string | undefined>();
+  const [conversationId, setConversationId] = useState<string | undefined>(
+    initialConversationId,
+  );
   const [currentStreamingText, setCurrentStreamingText] = useState("");
   const [currentStreamingThinking, setCurrentStreamingThinking] = useState<
     string | undefined
@@ -42,9 +53,17 @@ export function PackageChat({ packageIdentifier }: PackageChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastProcessedIndexRef = useRef(-1);
   const hasAddedFinalMessageRef = useRef(false);
+  const hasLoadedHistoryRef = useRef(false);
+  const savedMessageIdsRef = useRef<Set<string>>(new Set());
 
   const currentStreamingTextRef = useRef("");
   const currentStreamingThinkingRef = useRef<string | undefined>(undefined);
+  const [typingUsers, setTypingUsers] = useState<
+    Map<string, { userId: string; userName: string; text: string }>
+  >(new Map());
+  const typingTimeoutRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
 
   // Fetch available models
   const modelsQuery = useQuery(
@@ -53,6 +72,49 @@ export function PackageChat({ packageIdentifier }: PackageChatProps) {
 
   // Fetch agent info
   const agentInfoQuery = useQuery(orpc.package.getAgentInfo.queryOptions({}));
+
+  // Load conversation history when conversationId is set
+  const conversationQuery = useQuery(
+    conversationId
+      ? orpc.conversation.get.queryOptions({
+          input: { id: conversationId },
+        })
+      : { queryKey: ["skip-conversation"], queryFn: () => null, enabled: false },
+  );
+
+  // Load history from server when conversation loads
+  useEffect(() => {
+    if (
+      conversationQuery.data &&
+      conversationQuery.data.messages &&
+      !hasLoadedHistoryRef.current
+    ) {
+      hasLoadedHistoryRef.current = true;
+      const loadedMessages: Message[] = conversationQuery.data.messages.map(
+        (m) => ({
+          role: m.role as "user" | "assistant",
+          content: m.content,
+          id: m.id,
+          thinking: m.thinking ?? undefined,
+        }),
+      );
+      setMessages(loadedMessages);
+      // Track already-saved message IDs
+      for (const m of loadedMessages) {
+        savedMessageIdsRef.current.add(m.id);
+      }
+    }
+  }, [conversationQuery.data]);
+
+  // Create conversation mutation
+  const createConversationMutation = useMutation(
+    orpc.conversation.create.mutationOptions(),
+  );
+
+  // Add message mutation
+  const addMessageMutation = useMutation(
+    orpc.conversation.addMessage.mutationOptions(),
+  );
 
   // Set default model when models load
   useEffect(() => {
@@ -80,6 +142,112 @@ export function PackageChat({ packageIdentifier }: PackageChatProps) {
       });
     }
   }, [messages.length, isStreaming]);
+
+  // Sync conversationId to URL
+  useEffect(() => {
+    if (conversationId) {
+      navigate({
+        to: "/packages/$identifier/chat",
+        params: { identifier: packageIdentifier },
+        search: { conversationId },
+        replace: true,
+      });
+    }
+  }, [conversationId, packageIdentifier, navigate]);
+
+  // SSE stream for realtime collaboration
+  const realtimeQuery = useQuery(
+    conversationId
+      ? orpc.realtime.stream.experimental_streamedOptions({
+          input: { conversationId },
+          retry: true,
+          queryFnOptions: { refetchMode: "reset" },
+        })
+      : { queryKey: ["skip-realtime"], queryFn: () => null, enabled: false },
+  );
+
+  // Handle realtime events
+  useEffect(() => {
+    if (!realtimeQuery.data || !Array.isArray(realtimeQuery.data)) return;
+
+    for (const event of realtimeQuery.data) {
+      if (event.type === "typing") {
+        const key = event.userId;
+        if (event.isTyping) {
+          setTypingUsers((prev) => {
+            const next = new Map(prev);
+            next.set(key, {
+              userId: event.userId,
+              userName: event.userName,
+              text: event.text,
+            });
+            return next;
+          });
+          // Auto-clear after 3s
+          const existing = typingTimeoutRef.current.get(key);
+          if (existing) clearTimeout(existing);
+          typingTimeoutRef.current.set(
+            key,
+            setTimeout(() => {
+              setTypingUsers((prev) => {
+                const next = new Map(prev);
+                next.delete(key);
+                return next;
+              });
+            }, 3000),
+          );
+        } else {
+          setTypingUsers((prev) => {
+            const next = new Map(prev);
+            next.delete(key);
+            return next;
+          });
+        }
+      } else if (event.type === "message") {
+        // Add message from another user
+        const msg = event.message;
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === msg.id)) return prev;
+          return [
+            ...prev,
+            {
+              role: msg.role as "user" | "assistant",
+              content: msg.content,
+              id: msg.id,
+            },
+          ];
+        });
+      }
+    }
+  }, [realtimeQuery.data]);
+
+  // Broadcast typing mutation
+  const broadcastTypingMutation = useMutation(
+    orpc.realtime.broadcastTyping.mutationOptions(),
+  );
+
+  // Save message to server
+  const saveMessage = useCallback(
+    async (
+      convId: string,
+      role: "user" | "assistant",
+      content: string,
+      thinking?: string,
+    ) => {
+      try {
+        const result = await addMessageMutation.mutateAsync({
+          conversationId: convId,
+          role,
+          content,
+          thinking,
+        });
+        savedMessageIdsRef.current.add(result.id);
+      } catch (error) {
+        console.error("[Chat] Failed to save message:", error);
+      }
+    },
+    [addMessageMutation],
+  );
 
   // Streaming query
   const [streamingQueryKey, setStreamingQueryKey] = useState<{
@@ -153,11 +321,30 @@ export function PackageChat({ packageIdentifier }: PackageChatProps) {
                 thinking: latestThinking,
               };
               setMessages((prev) => [...prev, assistantMessage]);
+
+              // Save assistant message to server
+              // Use the conversationId from ref since state may not be updated yet
+              const convId = event.sessionId || conversationId;
+              if (convId) {
+                saveMessage(
+                  convId,
+                  "assistant",
+                  accumulatedText,
+                  latestThinking,
+                );
+              }
             }
 
             setStreamingQueryKey(null);
             lastProcessedIndexRef.current = -1;
             hasAddedFinalMessageRef.current = false;
+
+            // Invalidate conversation list to update sidebar
+            queryClient.invalidateQueries({
+              queryKey: orpc.conversation.list.queryOptions({
+                input: { packageIdentifier },
+              }).queryKey,
+            });
             return;
           }
         }
@@ -178,6 +365,9 @@ export function PackageChat({ packageIdentifier }: PackageChatProps) {
     streamingQuery.isFetching,
     streamingQuery.error,
     streamingQueryKey,
+    conversationId,
+    packageIdentifier,
+    saveMessage,
   ]);
 
   // Handle errors
@@ -198,14 +388,25 @@ export function PackageChat({ packageIdentifier }: PackageChatProps) {
   }, [streamingQuery.error]);
 
   const processMessage = useCallback(
-    (trimmedMessage: string) => {
+    async (trimmedMessage: string) => {
       if (!selectedModel) return;
 
-      const shouldStartNewSession =
-        messages.length === 0 || !conversationId;
-      const conversationIdToUse = shouldStartNewSession
-        ? undefined
-        : conversationId;
+      let convId = conversationId;
+
+      // Create a server-side conversation if we don't have one
+      if (!convId) {
+        try {
+          const conv = await createConversationMutation.mutateAsync({
+            packageIdentifier,
+            title: trimmedMessage.substring(0, 100),
+          });
+          convId = conv.id;
+          setConversationId(convId);
+        } catch (error) {
+          console.error("[Chat] Failed to create conversation:", error);
+          // Continue without persistence
+        }
+      }
 
       const userMessage: Message = {
         role: "user",
@@ -213,6 +414,11 @@ export function PackageChat({ packageIdentifier }: PackageChatProps) {
         id: `user-${Date.now()}`,
       };
       setMessages((prev) => [...prev, userMessage]);
+
+      // Save user message to server
+      if (convId) {
+        saveMessage(convId, "user", trimmedMessage);
+      }
 
       setCurrentStreamingText("");
       setCurrentStreamingThinking(undefined);
@@ -224,10 +430,16 @@ export function PackageChat({ packageIdentifier }: PackageChatProps) {
         identifier: packageIdentifier,
         message: trimmedMessage,
         model: selectedModel,
-        conversationId: conversationIdToUse,
+        conversationId: convId,
       });
     },
-    [selectedModel, conversationId, packageIdentifier, messages.length],
+    [
+      selectedModel,
+      conversationId,
+      packageIdentifier,
+      createConversationMutation,
+      saveMessage,
+    ],
   );
 
   const handleSendMessage = (message: string) => {
@@ -262,7 +474,30 @@ export function PackageChat({ packageIdentifier }: PackageChatProps) {
     setIsStreaming(false);
     lastProcessedIndexRef.current = -1;
     hasAddedFinalMessageRef.current = false;
+    hasLoadedHistoryRef.current = false;
+    savedMessageIdsRef.current.clear();
     setStreamingQueryKey(null);
+
+    navigate({
+      to: "/packages/$identifier/chat",
+      params: { identifier: packageIdentifier },
+      search: {},
+      replace: true,
+    });
+  };
+
+  const handleConversationSelect = (id: string) => {
+    // Reset state for loading new conversation
+    setMessages([]);
+    setCurrentStreamingText("");
+    setCurrentStreamingThinking(undefined);
+    setIsStreaming(false);
+    lastProcessedIndexRef.current = -1;
+    hasAddedFinalMessageRef.current = false;
+    hasLoadedHistoryRef.current = false;
+    savedMessageIdsRef.current.clear();
+    setStreamingQueryKey(null);
+    setConversationId(id);
   };
 
   if (modelsQuery.isLoading) {
@@ -311,7 +546,10 @@ export function PackageChat({ packageIdentifier }: PackageChatProps) {
       <div className="mb-4 space-y-2">
         <div className="flex items-center gap-4">
           <div className="flex-1">
-            <Select value={selectedModel} onValueChange={(v) => setSelectedModel(v ?? undefined)}>
+            <Select
+              value={selectedModel}
+              onValueChange={(v) => setSelectedModel(v ?? undefined)}
+            >
               <SelectTrigger className="w-full max-w-xs">
                 <SelectValue placeholder="Select model" />
               </SelectTrigger>
@@ -347,11 +585,24 @@ export function PackageChat({ packageIdentifier }: PackageChatProps) {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Chat</CardTitle>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
               {agentInfoQuery.data && (
                 <div className="text-xs text-muted-foreground">
                   Agent: {agentInfoQuery.data.name}
                 </div>
+              )}
+              <ChatHistorySelector
+                packageIdentifier={packageIdentifier}
+                currentConversationId={conversationId}
+                onConversationSelect={handleConversationSelect}
+              />
+              {conversationId && (
+                <ShareConversationDialog
+                  conversationId={conversationId}
+                  conversationTitle={
+                    conversationQuery.data?.title ?? "Conversation"
+                  }
+                />
               )}
               {messages.length > 0 && (
                 <Button
@@ -410,12 +661,25 @@ export function PackageChat({ packageIdentifier }: PackageChatProps) {
                 agentName={agentInfoQuery.data?.name}
               />
             )}
+            <ChatTypingIndicator
+              typingUsers={Array.from(typingUsers.values())}
+            />
             <div ref={messagesEndRef} />
           </div>
           <ChatInput
             onSend={handleSendMessage}
             disabled={!selectedModel || modelsQuery.isLoading}
             queueCount={messageQueue.length}
+            onTyping={
+              conversationId
+                ? (text) =>
+                    broadcastTypingMutation.mutate({
+                      conversationId: conversationId!,
+                      text,
+                      isTyping: text.length > 0,
+                    })
+                : undefined
+            }
           />
         </CardContent>
       </Card>

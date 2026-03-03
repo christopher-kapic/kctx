@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Send } from "lucide-react";
@@ -8,6 +8,7 @@ interface ChatInputProps {
   disabled?: boolean;
   placeholder?: string;
   queueCount?: number;
+  onTyping?: (text: string) => void;
 }
 
 export function ChatInput({
@@ -15,14 +16,18 @@ export function ChatInput({
   disabled,
   placeholder = "Ask a question about this package...",
   queueCount = 0,
+  onTyping,
 }: ChatInputProps) {
   const [message, setMessage] = useState("");
+  const typingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (message.trim() && !disabled) {
       onSend(message.trim());
       setMessage("");
+      // Clear typing indicator on send
+      if (onTyping) onTyping("");
     }
   };
 
@@ -32,6 +37,25 @@ export function ChatInput({
       handleSubmit(e);
     }
   };
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setMessage(value);
+
+    if (onTyping) {
+      if (typingDebounceRef.current) clearTimeout(typingDebounceRef.current);
+      typingDebounceRef.current = setTimeout(() => {
+        onTyping(value);
+      }, 300);
+    }
+  };
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (typingDebounceRef.current) clearTimeout(typingDebounceRef.current);
+    };
+  }, []);
 
   return (
     <div className="space-y-2">
@@ -43,7 +67,7 @@ export function ChatInput({
       <form onSubmit={handleSubmit} className="flex gap-2">
         <Textarea
           value={message}
-          onChange={(e) => setMessage(e.target.value)}
+          onChange={handleChange}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}

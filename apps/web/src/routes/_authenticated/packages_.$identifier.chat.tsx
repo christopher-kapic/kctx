@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { z } from "zod";
 import { PackageChat } from "@/components/package-chat";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
@@ -6,11 +7,15 @@ import { ArrowLeft } from "lucide-react";
 export const Route = createFileRoute(
   "/_authenticated/packages_/$identifier/chat",
 )({
+  validateSearch: z.object({
+    conversationId: z.string().optional(),
+  }),
   component: PackageChatPage,
 });
 
 function PackageChatPage() {
   const { identifier } = Route.useParams();
+  const { conversationId } = Route.useSearch();
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] p-6">
@@ -33,7 +38,10 @@ function PackageChatPage() {
         </div>
       </div>
       <div className="flex-1 min-h-0">
-        <PackageChat packageIdentifier={identifier} />
+        <PackageChat
+          packageIdentifier={identifier}
+          initialConversationId={conversationId}
+        />
       </div>
     </div>
   );

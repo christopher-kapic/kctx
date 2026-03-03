@@ -8,6 +8,8 @@ import { usersRouter } from "./users";
 import { statsRouter } from "./stats";
 import { apiKeyRouter } from "./apiKey";
 import { modelsRouter } from "./models";
+import { conversationRouter } from "./conversation";
+import { realtimeRouter } from "./realtime";
 
 export const appRouter = {
   healthCheck: publicProcedure.handler(() => {
@@ -26,6 +28,8 @@ export const appRouter = {
   stats: statsRouter,
   apiKey: apiKeyRouter,
   models: modelsRouter,
+  conversation: conversationRouter,
+  realtime: realtimeRouter,
 };
 export type AppRouter = typeof appRouter;
 export type AppRouterClient = RouterClient<typeof appRouter>;
