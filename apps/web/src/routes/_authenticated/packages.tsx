@@ -155,6 +155,7 @@ function TableSkeleton() {
 function CreatePackageDialog() {
   const [open, setOpen] = useState(false);
   const [defaultBranchEdited, setDefaultBranchEdited] = useState(false);
+  const [displayNameEdited, setDisplayNameEdited] = useState(false);
 
   const reposQuery = useQuery({
     ...orpc.repository.list.queryOptions({}),
@@ -234,6 +235,7 @@ function CreatePackageDialog() {
         setOpen(false);
         form.reset();
         setDefaultBranchEdited(false);
+        setDisplayNameEdited(false);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Failed to create package");
       }
@@ -286,7 +288,15 @@ function CreatePackageDialog() {
                   placeholder="e.g. react, express, lodash"
                   value={field.state.value}
                   onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
+                  onChange={(e) => {
+                    field.handleChange(e.target.value);
+                    if (!displayNameEdited) {
+                      const derived = e.target.value
+                        .replace(/-/g, " ")
+                        .replace(/^./, (c) => c.toUpperCase());
+                      form.setFieldValue("displayName", derived);
+                    }
+                  }}
                 />
                 {field.state.meta.errors.map((error) => (
                   <p key={error?.message} className="text-xs text-destructive">
@@ -306,7 +316,11 @@ function CreatePackageDialog() {
                   placeholder="e.g. React, Express, Lodash"
                   value={field.state.value}
                   onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => {
+                    setDisplayNameEdited(true);
+                    field.handleChange(e.target.value);
+                  }}
                 />
                 {field.state.meta.errors.map((error) => (
                   <p key={error?.message} className="text-xs text-destructive">

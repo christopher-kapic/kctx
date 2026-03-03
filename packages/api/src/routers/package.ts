@@ -274,7 +274,8 @@ export const packageRouter = {
         }),
       ),
     )
-    .handler(async function* ({ input }) {
+    .handler(async function* ({ input, context }) {
+      const userId = context.session.user.id;
       const pkg = await prisma.package.findUnique({
         where: { identifier: input.identifier },
         include: { Repository: true },
@@ -336,6 +337,7 @@ export const packageRouter = {
       });
 
       // Create or reuse session
+      const isNewSession = !input.conversationId;
       let currentSessionId = input.conversationId;
       if (!currentSessionId) {
         const sessionResult = await withTimeout(
@@ -353,6 +355,25 @@ export const packageRouter = {
         }
 
         currentSessionId = sessionResult.data.id;
+
+        // Create DB conversation with the opencode session ID
+        await prisma.conversation.create({
+          data: {
+            id: currentSessionId,
+            title: input.message.substring(0, 100),
+            packageId: pkg.id,
+            ownerId: userId,
+          },
+        });
+
+        // Save the user message
+        await prisma.chatMessage.create({
+          data: {
+            conversationId: currentSessionId,
+            role: "user",
+            content: input.message,
+          },
+        });
 
         // Send agent prompt for new sessions
         const agentPrompt = await getAgentPrompt(repoPath, pkg.kctxHelper ?? "");
@@ -372,6 +393,15 @@ export const packageRouter = {
         } catch (error) {
           console.error("[Chat] Agent prompt error:", error instanceof Error ? error.message : String(error));
         }
+      } else {
+        // Existing conversation — save the user message
+        await prisma.chatMessage.create({
+          data: {
+            conversationId: currentSessionId,
+            role: "user",
+            content: input.message,
+          },
+        });
       }
 
       if (!currentSessionId) {
@@ -497,6 +527,20 @@ export const packageRouter = {
             const sid = (event.properties as { sessionID?: string })?.sessionID;
             if (sid === currentSessionId && !streamComplete) {
               streamComplete = true;
+
+              // Save assistant message to DB
+              if (accumulatedText) {
+                const thinking = accumulatedThinking.length > 0 ? accumulatedThinking.join("\n\n") : undefined;
+                await prisma.chatMessage.create({
+                  data: {
+                    conversationId: currentSessionId,
+                    role: "assistant",
+                    content: accumulatedText,
+                    thinking,
+                  },
+                });
+              }
+
               const thinking = accumulatedThinking.length > 0 ? accumulatedThinking.join("\n\n") : undefined;
               yield { text: "", done: true, sessionId: currentSessionId, thinking };
               return;

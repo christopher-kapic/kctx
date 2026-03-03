@@ -154,6 +154,7 @@ async function queryOpencode(
   query: string,
   opencodeUrl: string,
   timeoutMs: number,
+  options?: { packageId?: string; ownerId?: string },
 ): Promise<{ response: string; sessionId: string }> {
   console.log(`[MCP] queryOpencode: url=${opencodeUrl}, repoPath=${repoPath}, timeout=${timeoutMs}ms`);
 
@@ -177,6 +178,29 @@ async function queryOpencode(
 
   const sessionId = sessionResult.data.id;
   console.log(`[MCP] Session created: ${sessionId}`);
+
+  // Create DB conversation if packageId and ownerId are provided
+  if (options?.packageId && options?.ownerId) {
+    try {
+      await prisma.conversation.create({
+        data: {
+          id: sessionId,
+          title: query.substring(0, 100),
+          packageId: options.packageId,
+          ownerId: options.ownerId,
+        },
+      });
+      await prisma.chatMessage.create({
+        data: {
+          conversationId: sessionId,
+          role: "user",
+          content: query,
+        },
+      });
+    } catch (error) {
+      console.error("[MCP] Failed to create conversation record:", error instanceof Error ? error.message : String(error));
+    }
+  }
 
   // Read configured model
   const model = await getModelFromConfig();
@@ -209,6 +233,11 @@ async function queryOpencode(
     );
     const lastPart = textParts[textParts.length - 1];
     if (lastPart) {
+      if (options?.packageId && options?.ownerId) {
+        await prisma.chatMessage.create({
+          data: { conversationId: sessionId, role: "assistant", content: lastPart.text },
+        }).catch(() => {});
+      }
       return { response: lastPart.text, sessionId };
     }
   }
@@ -243,6 +272,11 @@ async function queryOpencode(
         );
         const lastPart = textParts[textParts.length - 1];
         if (lastPart) {
+          if (options?.packageId && options?.ownerId) {
+            await prisma.chatMessage.create({
+              data: { conversationId: sessionId, role: "assistant", content: lastPart.text },
+            }).catch(() => {});
+          }
           return { response: lastPart.text, sessionId };
         }
       }
@@ -564,7 +598,7 @@ export function createMcpServer(): McpServer {
         ),
     },
     async ({ identifier, query, timeout }): Promise<CallToolResult> => {
-      getMcpContext(); // Ensure authenticated
+      const mcpCtx = getMcpContext();
 
       try {
         const pkg = await prisma.package.findUnique({
@@ -634,6 +668,7 @@ export function createMcpServer(): McpServer {
           enrichedQuery,
           settings.opencodeUrl,
           timeoutMs,
+          { packageId: pkg.id, ownerId: mcpCtx.userId },
         );
 
         // Fire-and-forget: generate helper text if missing

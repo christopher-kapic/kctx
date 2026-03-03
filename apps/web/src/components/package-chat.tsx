@@ -54,7 +54,7 @@ export function PackageChat({
   const lastProcessedIndexRef = useRef(-1);
   const hasAddedFinalMessageRef = useRef(false);
   const hasLoadedHistoryRef = useRef(false);
-  const savedMessageIdsRef = useRef<Set<string>>(new Set());
+
 
   const currentStreamingTextRef = useRef("");
   const currentStreamingThinkingRef = useRef<string | undefined>(undefined);
@@ -99,22 +99,8 @@ export function PackageChat({
         }),
       );
       setMessages(loadedMessages);
-      // Track already-saved message IDs
-      for (const m of loadedMessages) {
-        savedMessageIdsRef.current.add(m.id);
-      }
     }
   }, [conversationQuery.data]);
-
-  // Create conversation mutation
-  const createConversationMutation = useMutation(
-    orpc.conversation.create.mutationOptions(),
-  );
-
-  // Add message mutation
-  const addMessageMutation = useMutation(
-    orpc.conversation.addMessage.mutationOptions(),
-  );
 
   // Set default model when models load
   useEffect(() => {
@@ -226,29 +212,6 @@ export function PackageChat({
     orpc.realtime.broadcastTyping.mutationOptions(),
   );
 
-  // Save message to server
-  const saveMessage = useCallback(
-    async (
-      convId: string,
-      role: "user" | "assistant",
-      content: string,
-      thinking?: string,
-    ) => {
-      try {
-        const result = await addMessageMutation.mutateAsync({
-          conversationId: convId,
-          role,
-          content,
-          thinking,
-        });
-        savedMessageIdsRef.current.add(result.id);
-      } catch (error) {
-        console.error("[Chat] Failed to save message:", error);
-      }
-    },
-    [addMessageMutation],
-  );
-
   // Streaming query
   const [streamingQueryKey, setStreamingQueryKey] = useState<{
     identifier: string;
@@ -321,18 +284,6 @@ export function PackageChat({
                 thinking: latestThinking,
               };
               setMessages((prev) => [...prev, assistantMessage]);
-
-              // Save assistant message to server
-              // Use the conversationId from ref since state may not be updated yet
-              const convId = event.sessionId || conversationId;
-              if (convId) {
-                saveMessage(
-                  convId,
-                  "assistant",
-                  accumulatedText,
-                  latestThinking,
-                );
-              }
             }
 
             setStreamingQueryKey(null);
@@ -367,7 +318,6 @@ export function PackageChat({
     streamingQueryKey,
     conversationId,
     packageIdentifier,
-    saveMessage,
   ]);
 
   // Handle errors
@@ -391,23 +341,6 @@ export function PackageChat({
     async (trimmedMessage: string) => {
       if (!selectedModel) return;
 
-      let convId = conversationId;
-
-      // Create a server-side conversation if we don't have one
-      if (!convId) {
-        try {
-          const conv = await createConversationMutation.mutateAsync({
-            packageIdentifier,
-            title: trimmedMessage.substring(0, 100),
-          });
-          convId = conv.id;
-          setConversationId(convId);
-        } catch (error) {
-          console.error("[Chat] Failed to create conversation:", error);
-          // Continue without persistence
-        }
-      }
-
       const userMessage: Message = {
         role: "user",
         content: trimmedMessage,
@@ -415,30 +348,26 @@ export function PackageChat({
       };
       setMessages((prev) => [...prev, userMessage]);
 
-      // Save user message to server
-      if (convId) {
-        saveMessage(convId, "user", trimmedMessage);
-      }
-
       setCurrentStreamingText("");
       setCurrentStreamingThinking(undefined);
       setIsStreaming(true);
       lastProcessedIndexRef.current = -1;
       hasAddedFinalMessageRef.current = false;
 
+      // For new chats, don't pass conversationId — the backend creates the
+      // opencode session and DB conversation, then streams back the sessionId.
+      // For existing chats, pass the conversationId (which is the opencode session ID).
       setStreamingQueryKey({
         identifier: packageIdentifier,
         message: trimmedMessage,
         model: selectedModel,
-        conversationId: convId,
+        conversationId,
       });
     },
     [
       selectedModel,
       conversationId,
       packageIdentifier,
-      createConversationMutation,
-      saveMessage,
     ],
   );
 
@@ -475,7 +404,7 @@ export function PackageChat({
     lastProcessedIndexRef.current = -1;
     hasAddedFinalMessageRef.current = false;
     hasLoadedHistoryRef.current = false;
-    savedMessageIdsRef.current.clear();
+
     setStreamingQueryKey(null);
 
     navigate({
@@ -495,7 +424,7 @@ export function PackageChat({
     lastProcessedIndexRef.current = -1;
     hasAddedFinalMessageRef.current = false;
     hasLoadedHistoryRef.current = false;
-    savedMessageIdsRef.current.clear();
+
     setStreamingQueryKey(null);
     setConversationId(id);
   };
