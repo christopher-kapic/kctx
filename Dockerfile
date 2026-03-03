@@ -65,6 +65,9 @@ COPY apps/web/package.json apps/web/
 # Install production dependencies only
 RUN pnpm install --frozen-lockfile --prod
 
+# Install opencode CLI (needed for terminal feature)
+RUN npm i -g opencode-ai
+
 # Copy built server and web
 COPY --from=builder /app/apps/server/dist ./apps/server/dist
 COPY --from=builder /app/apps/web/dist ./apps/web/dist
