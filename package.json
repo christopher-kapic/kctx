@@ -37,6 +37,7 @@
       "prisma",
       "esbuild",
       "@libsql/linux-x64-gnu",
+      "node-pty",
       "sharp"
     ]
   }
