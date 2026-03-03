@@ -127,6 +127,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.27.1
         version: 1.27.1(zod@4.3.6)
+      '@opencode-ai/sdk':
+        specifier: ^1.2.15
+        version: 1.2.15
       '@orpc/openapi':
         specifier: 'catalog:'
         version: 1.13.6(ws@8.19.0)
@@ -300,6 +303,9 @@ importers:
       '@kctx/env':
         specifier: workspace:*
         version: link:../env
+      '@opencode-ai/sdk':
+        specifier: ^1.2.15
+        version: 1.2.15
       '@orpc/client':
         specifier: 'catalog:'
         version: 1.13.6
@@ -1324,6 +1330,9 @@ packages:
 
   '@open-draft/until@2.1.0':
     resolution: {integrity: sha512-U69T3ItWHvLwGg5eJ0n3I62nWuE6ilHlmz7zM0npLBRvPRd7e6NYmg54vvRtP5mZG7kZqZCFVdsTWo7BPtBujg==}
+
+  '@opencode-ai/sdk@1.2.15':
+    resolution: {integrity: sha512-NUJNlyBCdZ4R0EBLjJziEQOp2XbRPJosaMcTcWSWO5XJPKGUpz0u8ql+5cR8K+v2RJ+hp2NobtNwpjEYfe6BRQ==}
 
   '@orpc/client@1.13.6':
     resolution: {integrity: sha512-M6lYM6fJUFp9GR+It/qglYTeXwspb6sGj46xXWHqHS6iDVquqju0bdYuLOfHx8CGJcUSzi0aKUcqMXiGJhBG3w==}
@@ -4995,6 +5004,8 @@ snapshots:
       outvariant: 1.4.3
 
   '@open-draft/until@2.1.0': {}
+
+  '@opencode-ai/sdk@1.2.15': {}
 
   '@orpc/client@1.13.6':
     dependencies:

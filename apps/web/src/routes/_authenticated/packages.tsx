@@ -1,7 +1,8 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useForm } from "@tanstack/react-form";
-import { Loader2, Pencil, Plus, Trash2, Upload, AlertCircle } from "lucide-react";
+import { Loader2, MessageCircle, Pencil, Plus, Trash2, Upload, AlertCircle } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import z from "zod";
@@ -937,6 +938,19 @@ function PackagesPage() {
                   <TableCell>{pkg.defaultTag}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
+                      <Link
+                        to="/packages/$identifier/chat"
+                        params={{ identifier: pkg.identifier }}
+                      >
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          disabled={pkg.Repository?.cloneStatus !== "READY"}
+                        >
+                          <MessageCircle className="size-3.5" />
+                          <span className="sr-only">Chat</span>
+                        </Button>
+                      </Link>
                       <Button
                         variant="ghost"
                         size="icon-sm"
