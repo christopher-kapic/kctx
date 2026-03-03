@@ -168,12 +168,12 @@ app.get(
 const mcpServer = createMcpServer();
 const mcpTransport = new StreamableHTTPTransport();
 
-let mcpConnected = false;
-async function ensureMcpConnected() {
-  if (!mcpConnected) {
-    await mcpServer.connect(mcpTransport);
-    mcpConnected = true;
+let mcpConnectPromise: Promise<void> | null = null;
+function ensureMcpConnected() {
+  if (!mcpConnectPromise) {
+    mcpConnectPromise = mcpServer.connect(mcpTransport);
   }
+  return mcpConnectPromise;
 }
 
 // MCP endpoint — authenticated via API key
