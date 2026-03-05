@@ -6,4 +6,5 @@ export default defineConfig({
   outDir: "./dist",
   clean: true,
   noExternal: [/@kctx\/.*/],
+  external: ["better-sqlite3", "sqlite-vec"],
 });

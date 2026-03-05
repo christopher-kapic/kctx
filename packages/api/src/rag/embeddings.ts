@@ -40,6 +40,10 @@ export async function generateEmbeddings(
 
     if (!response.ok) {
       const text = await response.text();
+      console.error(
+        `[RAG] Embedding API error ${response.status} from ${url}:`,
+        text,
+      );
       throw new Error(`Embedding API error ${response.status}: ${text}`);
     }
 
