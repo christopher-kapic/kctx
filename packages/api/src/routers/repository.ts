@@ -291,18 +291,10 @@ export const repositoryRouter = {
 
         try {
           const sshKey = repo.isPrivate ? input?.sshPrivateKey : undefined;
-          const { changed, headCommit } = await pullAndCheckChanges(
+          await pullAndCheckChanges(
             repo.clonedPath,
             sshKey,
           );
-
-          const needsIndex =
-            repo.embeddingStatus === "NOT_INDEXED" ||
-            repo.embeddingStatus === "FAILED";
-
-          if (changed || needsIndex) {
-            await triggerReindex(repo.id, repo.clonedPath, headCommit);
-          }
 
           results.push({
             id: repo.id,
