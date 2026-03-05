@@ -29,8 +29,7 @@ COPY apps/web/package.json apps/web/
 COPY apps/server/package.json apps/server/
 
 # Install all dependencies (including devDependencies for building)
-# Rebuild native modules (node-pty, better-sqlite3) to ensure they're compiled for linux
-RUN pnpm install --frozen-lockfile && pnpm rebuild
+RUN pnpm install --frozen-lockfile
 
 # Copy all source code
 COPY packages packages
@@ -53,14 +52,18 @@ ENV NODE_ENV=production
 
 WORKDIR /app
 
-# Copy node_modules from builder (includes compiled native modules for linux)
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/packages/db/node_modules ./packages/db/node_modules
-COPY --from=builder /app/packages/auth/node_modules ./packages/auth/node_modules
-COPY --from=builder /app/packages/api/node_modules ./packages/api/node_modules
-COPY --from=builder /app/packages/env/node_modules ./packages/env/node_modules
-COPY --from=builder /app/apps/server/node_modules ./apps/server/node_modules
-COPY --from=builder /app/apps/web/node_modules ./apps/web/node_modules
+# Copy workspace config for pnpm install
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+COPY packages/db/package.json packages/db/
+COPY packages/auth/package.json packages/auth/
+COPY packages/api/package.json packages/api/
+COPY packages/env/package.json packages/env/
+COPY packages/config/package.json packages/config/
+COPY apps/server/package.json apps/server/
+COPY apps/web/package.json apps/web/
+
+# Install production dependencies only
+RUN pnpm install --frozen-lockfile --prod
 
 # Install opencode CLI (needed for terminal feature)
 RUN npm i -g opencode-ai
