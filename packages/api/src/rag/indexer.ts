@@ -62,11 +62,13 @@ function chunkText(
 
 async function doIndex(
   repoId: string,
+  repoLabel: string,
   repoPath: string,
   settings: EmbeddingSettings,
 ): Promise<void> {
+  let progress = { phase: "reading files", percent: 0 };
   const heartbeat = setInterval(() => {
-    console.log(`[RAG] Still indexing ${repoId}...`);
+    console.log(`[RAG] Indexing ${repoLabel} (${repoId}): ${progress.phase} (${progress.percent}%)`);
   }, 10_000);
 
   try {
@@ -82,25 +84,29 @@ async function doIndex(
     // Read and chunk files
     const allChunks: Array<{ filePath: string; text: string }> = [];
 
-    for (const file of files) {
+    for (let i = 0; i < files.length; i++) {
       try {
-        const fullPath = path.join(repoPath, file);
+        const fullPath = path.join(repoPath, files[i]!);
         const content = await readFile(fullPath, "utf-8");
         if (content.length > MAX_FILE_SIZE || content.length === 0) continue;
 
-        const chunks = chunkText(content, file);
+        const chunks = chunkText(content, files[i]!);
         allChunks.push(...chunks);
       } catch {
         // Skip files that can't be read (binary, permissions, etc.)
         continue;
       }
+      progress.percent = Math.round(((i + 1) / files.length) * 100);
     }
 
     if (allChunks.length === 0) return;
 
     // Generate embeddings
+    progress = { phase: "generating embeddings", percent: 0 };
     const texts = allChunks.map((c) => c.text);
-    const { embeddings, dimension } = await generateEmbeddings(texts, settings);
+    const { embeddings, dimension } = await generateEmbeddings(texts, settings, (done, total) => {
+      progress.percent = Math.round((done / total) * 100);
+    });
 
     // Ensure the vec table exists with the right dimension
     ensureVecTable(dimension);
@@ -117,7 +123,7 @@ async function doIndex(
     insertChunks(repoId, chunksWithEmbeddings);
 
     console.log(
-      `[RAG] Indexed ${repoId}: ${files.length} files, ${allChunks.length} chunks`,
+      `[RAG] Indexed ${repoLabel} (${repoId}): ${files.length} files, ${allChunks.length} chunks`,
     );
   } finally {
     clearInterval(heartbeat);
@@ -134,13 +140,14 @@ export async function indexRepository(
   headCommit: string,
   settings: EmbeddingSettings,
 ): Promise<void> {
-  await prisma.repository.update({
+  const repo = await prisma.repository.update({
     where: { id: repoId },
     data: { embeddingStatus: "INDEXING", embeddingError: null },
   });
+  const repoLabel = `${repo.orgOrUser}/${repo.repoName}`;
 
   try {
-    await doIndex(repoId, repoPath, settings);
+    await doIndex(repoId, repoLabel, repoPath, settings);
     await prisma.repository.update({
       where: { id: repoId },
       data: {
@@ -152,7 +159,7 @@ export async function indexRepository(
   } catch (error) {
     const message =
       error instanceof Error ? error.message : String(error);
-    console.error(`[RAG] Index failed for ${repoId}:`, message);
+    console.error(`[RAG] Index failed for ${repoLabel} (${repoId}):`, message);
     await prisma.repository.update({
       where: { id: repoId },
       data: {

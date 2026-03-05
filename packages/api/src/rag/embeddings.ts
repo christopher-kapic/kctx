@@ -15,6 +15,7 @@ export function isEmbeddingConfigured(settings: EmbeddingSettings): boolean {
 export async function generateEmbeddings(
   texts: string[],
   settings: EmbeddingSettings,
+  onProgress?: (processed: number, total: number) => void,
 ): Promise<{ embeddings: Float32Array[]; dimension: number }> {
   if (!texts.length) return { embeddings: [], dimension: 0 };
 
@@ -73,6 +74,8 @@ export async function generateEmbeddings(
       allEmbeddings.push(arr);
       if (!dimension) dimension = arr.length;
     }
+
+    onProgress?.(Math.min(i + BATCH_SIZE, texts.length), texts.length);
 
     // Delay between batches to avoid rate limits
     if (i + BATCH_SIZE < texts.length) {
