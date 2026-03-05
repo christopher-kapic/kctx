@@ -8,7 +8,8 @@ import { simpleGit } from "simple-git";
 import prisma from "@kctx/db";
 import { env } from "@kctx/env/server";
 
-import { protectedProcedure } from "../index";
+import { adminProcedure, protectedProcedure } from "../index";
+import { indexRepository, isEmbeddingConfigured } from "../rag/index";
 
 /** Detect the default branch for a cloned repository */
 async function getDefaultBranch(clonedPath: string): Promise<string> {
@@ -176,7 +177,7 @@ export const repositoryRouter = {
       return repo;
     }),
 
-  update: protectedProcedure
+  update: adminProcedure
     .input(
       z.object({
         id: z.string(),
@@ -215,15 +216,19 @@ export const repositoryRouter = {
         }
       }
 
-      await pullRepository({
-        clonedPath: repo.clonedPath,
-        sshPrivateKey: input.sshPrivateKey,
-      });
+      const { changed, headCommit } = await pullAndCheckChanges(
+        repo.clonedPath,
+        input.sshPrivateKey,
+      );
+
+      if (changed) {
+        await triggerReindex(repo.id, repo.clonedPath, headCommit);
+      }
 
       return { success: true };
     }),
 
-  bulkUpdate: protectedProcedure
+  bulkUpdate: adminProcedure
     .input(
       z.object({
         sshPrivateKey: z.string().optional(),
@@ -281,10 +286,16 @@ export const repositoryRouter = {
         }
 
         try {
-          await pullRepository({
-            clonedPath: repo.clonedPath,
-            sshPrivateKey: repo.isPrivate ? input?.sshPrivateKey : undefined,
-          });
+          const sshKey = repo.isPrivate ? input?.sshPrivateKey : undefined;
+          const { changed, headCommit } = await pullAndCheckChanges(
+            repo.clonedPath,
+            sshKey,
+          );
+
+          if (changed) {
+            await triggerReindex(repo.id, repo.clonedPath, headCommit);
+          }
+
           results.push({
             id: repo.id,
             repoName: `${repo.orgOrUser}/${repo.repoName}`,
@@ -461,6 +472,43 @@ async function pullRepository({
       }
     }
   }
+}
+
+/** Pull a repo and detect whether HEAD changed */
+async function pullAndCheckChanges(
+  clonedPath: string,
+  sshPrivateKey?: string,
+): Promise<{ changed: boolean; headCommit: string }> {
+  const git = simpleGit(clonedPath);
+  const beforeHead = (await git.revparse(["HEAD"])).trim();
+
+  await pullRepository({ clonedPath, sshPrivateKey });
+
+  const afterHead = (await git.revparse(["HEAD"])).trim();
+  return {
+    changed: beforeHead !== afterHead,
+    headCommit: afterHead,
+  };
+}
+
+/** Fire-and-forget reindex if embedding is configured */
+async function triggerReindex(
+  repoId: string,
+  repoPath: string,
+  headCommit: string,
+): Promise<void> {
+  const settings = await prisma.siteSettings.upsert({
+    where: { id: "default" },
+    create: { id: "default" },
+    update: {},
+  });
+
+  if (!isEmbeddingConfigured(settings)) return;
+
+  // Fire-and-forget — don't block the response
+  indexRepository(repoId, repoPath, headCommit, settings).catch((err) => {
+    console.error(`[RAG] Reindex failed for ${repoId}:`, err);
+  });
 }
 
 export { parseGitUrl, cloneRepository, pullRepository };

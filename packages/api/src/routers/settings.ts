@@ -35,6 +35,9 @@ export const settingsRouter = {
         signupsEnabled: z.boolean().optional(),
         opencodeUrl: z.string().optional(),
         opencodeTimeoutMs: z.number().int().positive().max(900000).optional(),
+        embeddingBaseUrl: z.string().optional(),
+        embeddingApiKey: z.string().optional(),
+        embeddingModel: z.string().optional(),
       }),
     )
     .handler(async ({ input }) => {

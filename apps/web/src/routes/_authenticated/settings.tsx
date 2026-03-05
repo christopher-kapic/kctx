@@ -2,6 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useForm } from "@tanstack/react-form";
 import {
+  Database,
   Save,
   Settings,
   Shield,
@@ -66,6 +67,9 @@ function SiteSettingsCard() {
       signupsEnabled?: boolean;
       opencodeUrl?: string;
       opencodeTimeoutMs?: number;
+      embeddingBaseUrl?: string;
+      embeddingApiKey?: string;
+      embeddingModel?: string;
     }) => client.settings.update(input),
     onSuccess: () => {
       toast.success("Settings updated");
@@ -211,8 +215,123 @@ function SiteSettingsCard() {
             </Button>
           </form>
         </div>
+
+        <EmbeddingSettingsSection
+          settings={settingsQuery.data}
+          updateMutation={updateMutation}
+        />
       </CardContent>
     </Card>
+  );
+}
+
+function EmbeddingSettingsSection({
+  settings,
+  updateMutation,
+}: {
+  settings: {
+    embeddingBaseUrl?: string;
+    embeddingApiKey?: string;
+    embeddingModel?: string;
+  } | undefined;
+  updateMutation: { isPending: boolean; mutate: (input: {
+    embeddingBaseUrl?: string;
+    embeddingApiKey?: string;
+    embeddingModel?: string;
+  }) => void };
+}) {
+  const embeddingForm = useForm({
+    defaultValues: {
+      embeddingBaseUrl: settings?.embeddingBaseUrl ?? "",
+      embeddingApiKey: settings?.embeddingApiKey ?? "",
+      embeddingModel: settings?.embeddingModel ?? "",
+    },
+    onSubmit: async ({ value }) => {
+      updateMutation.mutate({
+        embeddingBaseUrl: value.embeddingBaseUrl || undefined,
+        embeddingApiKey: value.embeddingApiKey || undefined,
+        embeddingModel: value.embeddingModel || undefined,
+      });
+    },
+  });
+
+  return (
+    <div className="border-t pt-4">
+      <div className="mb-3 flex items-center gap-2">
+        <Database className="size-4 text-muted-foreground" />
+        <div>
+          <p className="text-sm font-medium">Embedding / RAG Settings</p>
+          <p className="text-xs text-muted-foreground">
+            Configure an OpenAI-compatible embedding API for semantic code search.
+            Leave blank to skip RAG.
+          </p>
+        </div>
+      </div>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          embeddingForm.handleSubmit();
+        }}
+        className="space-y-4"
+      >
+        <embeddingForm.Field name="embeddingBaseUrl">
+          {(field) => (
+            <div className="space-y-1.5">
+              <Label htmlFor={field.name}>Embedding Base URL</Label>
+              <Input
+                id={field.name}
+                placeholder="https://api.openai.com/v1"
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+              />
+            </div>
+          )}
+        </embeddingForm.Field>
+
+        <embeddingForm.Field name="embeddingApiKey">
+          {(field) => (
+            <div className="space-y-1.5">
+              <Label htmlFor={field.name}>Embedding API Key</Label>
+              <Input
+                id={field.name}
+                type="password"
+                placeholder="sk-..."
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+              />
+            </div>
+          )}
+        </embeddingForm.Field>
+
+        <embeddingForm.Field name="embeddingModel">
+          {(field) => (
+            <div className="space-y-1.5">
+              <Label htmlFor={field.name}>Embedding Model</Label>
+              <Input
+                id={field.name}
+                placeholder="text-embedding-3-small"
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+              />
+            </div>
+          )}
+        </embeddingForm.Field>
+
+        <Button
+          type="submit"
+          size="sm"
+          disabled={updateMutation.isPending}
+        >
+          <Save className="size-3.5" />
+          {updateMutation.isPending ? "Saving..." : "Save Embedding Settings"}
+        </Button>
+      </form>
+    </div>
   );
 }
 

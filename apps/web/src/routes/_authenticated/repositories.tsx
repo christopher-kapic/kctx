@@ -1,8 +1,18 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { RefreshCw, Lock, Globe } from "lucide-react";
-import { useState } from "react";
+import {
+  RefreshCw,
+  Lock,
+  Globe,
+  Check,
+  Loader2,
+  AlertCircle,
+  Database,
+} from "lucide-react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
+
+import { authClient } from "@/lib/auth-client";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +37,10 @@ import { client, orpc, queryClient } from "@/utils/orpc";
 
 export const Route = createFileRoute("/_authenticated/repositories")({
   component: RepositoriesPage,
+  beforeLoad: async () => {
+    const session = await authClient.getSession();
+    return { isAdmin: session.data?.user.role === "admin" };
+  },
 });
 
 type RepoItem = {
@@ -36,6 +50,8 @@ type RepoItem = {
   repoName: string;
   isPrivate: boolean;
   updatedAt: string;
+  embeddingStatus: string;
+  embeddingError: string | null;
   _count: { Packages: number };
 };
 
@@ -51,6 +67,7 @@ function TableSkeleton() {
             <TableHead>Visibility</TableHead>
             <TableHead>Last Updated</TableHead>
             <TableHead>Packages</TableHead>
+            <TableHead>Embedding</TableHead>
             <TableHead className="w-20" />
           </TableRow>
         </TableHeader>
@@ -63,6 +80,7 @@ function TableSkeleton() {
               <TableCell><Skeleton className="h-4 w-16" /></TableCell>
               <TableCell><Skeleton className="h-4 w-24" /></TableCell>
               <TableCell><Skeleton className="h-4 w-8" /></TableCell>
+              <TableCell><Skeleton className="h-4 w-16" /></TableCell>
               <TableCell><Skeleton className="h-4 w-16" /></TableCell>
             </TableRow>
           ))}
@@ -278,11 +296,63 @@ function UpdateRepoButton({
   );
 }
 
+function EmbeddingStatusBadge({ repo }: { repo: RepoItem }) {
+  switch (repo.embeddingStatus) {
+    case "INDEXING":
+      return (
+        <span className="inline-flex items-center gap-1 text-xs text-yellow-600">
+          <Loader2 className="size-3 animate-spin" />
+          Indexing...
+        </span>
+      );
+    case "INDEXED":
+      return (
+        <span className="inline-flex items-center gap-1 text-xs text-green-600">
+          <Check className="size-3" />
+          Indexed
+        </span>
+      );
+    case "FAILED":
+      return (
+        <span
+          className="inline-flex items-center gap-1 text-xs text-red-600"
+          title={repo.embeddingError ?? "Unknown error"}
+        >
+          <AlertCircle className="size-3" />
+          Failed
+        </span>
+      );
+    default:
+      return (
+        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+          <Database className="size-3" />
+          Not indexed
+        </span>
+      );
+  }
+}
+
 function RepositoriesPage() {
+  const { isAdmin } = Route.useRouteContext();
   const reposQuery = useQuery(orpc.repository.list.queryOptions({}));
   const sshQuery = useQuery(orpc.settings.sshEnabled.queryOptions({}));
 
   const sshEnabled = sshQuery.data?.sshCloningEnabled ?? true;
+
+  // Auto-refresh while any repo is indexing
+  const hasIndexing = reposQuery.data?.some(
+    (r: unknown) => (r as RepoItem).embeddingStatus === "INDEXING",
+  );
+
+  useEffect(() => {
+    if (!hasIndexing) return;
+    const interval = setInterval(() => {
+      queryClient.invalidateQueries({
+        queryKey: orpc.repository.list.queryOptions({}).queryKey,
+      });
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [hasIndexing]);
 
   return (
     <div className="space-y-6 p-6">
@@ -295,7 +365,7 @@ function RepositoriesPage() {
             Manage cloned git repositories and trigger updates
           </p>
         </div>
-        {!reposQuery.isLoading && reposQuery.data?.length ? (
+        {isAdmin && !reposQuery.isLoading && reposQuery.data?.length ? (
           <BulkUpdateButton sshEnabled={sshEnabled} />
         ) : null}
       </div>
@@ -320,50 +390,57 @@ function RepositoriesPage() {
                 <TableHead>Visibility</TableHead>
                 <TableHead>Last Updated</TableHead>
                 <TableHead>Packages</TableHead>
-                <TableHead className="w-20" />
+                <TableHead>Embedding</TableHead>
+                {isAdmin && <TableHead className="w-20" />}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {reposQuery.data.map((repo) => (
-                <TableRow key={repo.id}>
-                  <TableCell>
-                    <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                      {repo.gitProvider}
-                    </code>
-                  </TableCell>
-                  <TableCell>{repo.orgOrUser}</TableCell>
-                  <TableCell className="font-medium">
-                    {repo.repoName}
-                  </TableCell>
-                  <TableCell>
-                    <span className="inline-flex items-center gap-1 text-xs">
-                      {repo.isPrivate ? (
-                        <>
-                          <Lock className="size-3" />
-                          Private
-                        </>
-                      ) : (
-                        <>
-                          <Globe className="size-3" />
-                          Public
-                        </>
-                      )}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {new Date(repo.updatedAt).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    {(repo as unknown as RepoItem)._count.Packages}
-                  </TableCell>
-                  <TableCell>
-                    <UpdateRepoButton
-                      repo={repo as unknown as RepoItem}
-                      sshEnabled={sshEnabled}
-                    />
-                  </TableCell>
-                </TableRow>
-              ))}
+              {reposQuery.data.map((repo) => {
+                const r = repo as unknown as RepoItem;
+                return (
+                  <TableRow key={repo.id}>
+                    <TableCell>
+                      <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                        {repo.gitProvider}
+                      </code>
+                    </TableCell>
+                    <TableCell>{repo.orgOrUser}</TableCell>
+                    <TableCell className="font-medium">
+                      {repo.repoName}
+                    </TableCell>
+                    <TableCell>
+                      <span className="inline-flex items-center gap-1 text-xs">
+                        {repo.isPrivate ? (
+                          <>
+                            <Lock className="size-3" />
+                            Private
+                          </>
+                        ) : (
+                          <>
+                            <Globe className="size-3" />
+                            Public
+                          </>
+                        )}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {new Date(repo.updatedAt).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>{r._count.Packages}</TableCell>
+                    <TableCell>
+                      <EmbeddingStatusBadge repo={r} />
+                    </TableCell>
+                    {isAdmin && (
+                      <TableCell>
+                        <UpdateRepoButton
+                          repo={r}
+                          sshEnabled={sshEnabled}
+                        />
+                      </TableCell>
+                    )}
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>

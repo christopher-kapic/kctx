@@ -11,6 +11,13 @@ enum CloneStatus {
   FAILED
 }
 
+enum EmbeddingStatus {
+  NOT_INDEXED
+  INDEXING
+  INDEXED
+  FAILED
+}
+
 model Repository {
   id          String      @id @default(cuid())
   createdAt   DateTime    @default(now())
@@ -22,8 +29,11 @@ model Repository {
   isPrivate   Boolean     @default(false)
   authMethod  AuthMethod  @default(HTTPS)
   clonedPath  String?
-  cloneStatus CloneStatus @default(READY)
-  Packages    Package[]
+  cloneStatus       CloneStatus     @default(READY)
+  embeddingStatus   EmbeddingStatus @default(NOT_INDEXED)
+  lastIndexedCommit String?
+  embeddingError    String?
+  Packages          Package[]
 
   @@unique([gitProvider, orgOrUser, repoName])
 }
@@ -92,6 +102,9 @@ model SiteSettings {
   signupsEnabled    Boolean @default(true)
   opencodeUrl       String  @default("")
   opencodeTimeoutMs Int     @default(30000)
+  embeddingBaseUrl  String  @default("")
+  embeddingApiKey   String  @default("")
+  embeddingModel    String  @default("")
 }
 
 model ApiKey {

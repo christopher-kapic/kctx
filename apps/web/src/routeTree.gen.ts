@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedTerminalRouteImport } from './routes/_authenticated/terminal'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedRepositoriesRouteImport } from './routes/_authenticated/repositories'
 import { Route as AuthenticatedPackagesRouteImport } from './routes/_authenticated/packages'
@@ -33,6 +34,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedTerminalRoute = AuthenticatedTerminalRouteImport.update({
+  id: '/terminal',
+  path: '/terminal',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
@@ -81,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/packages': typeof AuthenticatedPackagesRoute
   '/repositories': typeof AuthenticatedRepositoriesRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/terminal': typeof AuthenticatedTerminalRoute
   '/packages/$identifier/chat': typeof AuthenticatedPackagesIdentifierChatRoute
 }
 export interface FileRoutesByTo {
@@ -92,6 +99,7 @@ export interface FileRoutesByTo {
   '/packages': typeof AuthenticatedPackagesRoute
   '/repositories': typeof AuthenticatedRepositoriesRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/terminal': typeof AuthenticatedTerminalRoute
   '/packages/$identifier/chat': typeof AuthenticatedPackagesIdentifierChatRoute
 }
 export interface FileRoutesById {
@@ -105,6 +113,7 @@ export interface FileRoutesById {
   '/_authenticated/packages': typeof AuthenticatedPackagesRoute
   '/_authenticated/repositories': typeof AuthenticatedRepositoriesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/terminal': typeof AuthenticatedTerminalRoute
   '/_authenticated/packages_/$identifier/chat': typeof AuthenticatedPackagesIdentifierChatRoute
 }
 export interface FileRouteTypes {
@@ -118,6 +127,7 @@ export interface FileRouteTypes {
     | '/packages'
     | '/repositories'
     | '/settings'
+    | '/terminal'
     | '/packages/$identifier/chat'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -129,6 +139,7 @@ export interface FileRouteTypes {
     | '/packages'
     | '/repositories'
     | '/settings'
+    | '/terminal'
     | '/packages/$identifier/chat'
   id:
     | '__root__'
@@ -141,6 +152,7 @@ export interface FileRouteTypes {
     | '/_authenticated/packages'
     | '/_authenticated/repositories'
     | '/_authenticated/settings'
+    | '/_authenticated/terminal'
     | '/_authenticated/packages_/$identifier/chat'
   fileRoutesById: FileRoutesById
 }
@@ -172,6 +184,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/terminal': {
+      id: '/_authenticated/terminal'
+      path: '/terminal'
+      fullPath: '/terminal'
+      preLoaderRoute: typeof AuthenticatedTerminalRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/settings': {
       id: '/_authenticated/settings'
@@ -232,6 +251,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedPackagesRoute: typeof AuthenticatedPackagesRoute
   AuthenticatedRepositoriesRoute: typeof AuthenticatedRepositoriesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedTerminalRoute: typeof AuthenticatedTerminalRoute
   AuthenticatedPackagesIdentifierChatRoute: typeof AuthenticatedPackagesIdentifierChatRoute
 }
 
@@ -242,6 +262,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedPackagesRoute: AuthenticatedPackagesRoute,
   AuthenticatedRepositoriesRoute: AuthenticatedRepositoriesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedTerminalRoute: AuthenticatedTerminalRoute,
   AuthenticatedPackagesIdentifierChatRoute:
     AuthenticatedPackagesIdentifierChatRoute,
 }

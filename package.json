@@ -33,12 +33,7 @@
   "packageManager": "pnpm@10.20.0",
   "pnpm": {
     "onlyBuiltDependencies": [
-      "@prisma/engines",
-      "prisma",
-      "esbuild",
-      "@libsql/linux-x64-gnu",
-      "node-pty",
-      "sharp"
+      "better-sqlite3"
     ]
   }
 }

@@ -9,6 +9,11 @@ import { simpleGit } from "simple-git";
 import prisma from "@kctx/db";
 import { env } from "@kctx/env/server";
 import { createOpencodeClient } from "@opencode-ai/sdk";
+import {
+  searchRelevantChunks,
+  isEmbeddingConfigured,
+  indexRepository,
+} from "@kctx/api/rag";
 
 export interface McpContext {
   userId: string;
@@ -630,16 +635,28 @@ export function createMcpServer(): McpServer {
           };
         }
 
-        // Auto-pull for public repos (best-effort)
+        const settings = await getSettings();
+
+        // Auto-pull for public repos (best-effort), with reindex if changed
         if (!pkg.Repository.isPrivate && pkg.Repository.clonedPath) {
           try {
-            await simpleGit(pkg.Repository.clonedPath).pull();
+            const git = simpleGit(pkg.Repository.clonedPath);
+            const beforeHead = (await git.revparse(["HEAD"])).trim();
+            await git.pull();
+            const afterHead = (await git.revparse(["HEAD"])).trim();
+
+            if (beforeHead !== afterHead && isEmbeddingConfigured(settings)) {
+              indexRepository(
+                pkg.Repository.id,
+                pkg.Repository.clonedPath,
+                afterHead,
+                settings,
+              ).catch(() => {});
+            }
           } catch {
-            // Proceed even if pull fails
+            // Proceed even if pull/reindex fails
           }
         }
-
-        const settings = await getSettings();
 
         if (!settings.opencodeUrl) {
           return {
@@ -657,10 +674,21 @@ export function createMcpServer(): McpServer {
           ? timeout * 1000
           : settings.opencodeTimeoutMs;
 
-        // Prepend kctxHelper as context if available
-        let enrichedQuery = query;
+        // Search for relevant code chunks via RAG
+        const ragContext = await searchRelevantChunks(
+          pkg.Repository.id,
+          query,
+          settings,
+        );
+
+        // Build enriched query with kctxHelper + RAG context
+        let enrichedQuery = "";
         if (pkg.kctxHelper?.trim()) {
-          enrichedQuery = `Context about this package:\n${pkg.kctxHelper}\n\n${query}`;
+          enrichedQuery += `Context about this package:\n${pkg.kctxHelper}\n\n`;
+        }
+        enrichedQuery += query;
+        if (ragContext) {
+          enrichedQuery += `\n\nPotentially relevant files:\n${ragContext}`;
         }
 
         const result = await queryOpencode(
