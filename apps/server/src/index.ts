@@ -30,6 +30,18 @@ import {
   getSessions,
 } from "./terminal/index.js";
 
+// Reset stale indexing statuses from previous runs (e.g. killed by deployment)
+prisma.repository
+  .updateMany({
+    where: { embeddingStatus: "INDEXING" },
+    data: { embeddingStatus: "NOT_INDEXED", embeddingError: "Interrupted by server restart" },
+  })
+  .then((result) => {
+    if (result.count > 0) {
+      console.log(`[RAG] Reset ${result.count} stale INDEXING status(es)`);
+    }
+  });
+
 const app = new Hono();
 const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 
