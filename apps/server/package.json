@@ -28,7 +28,9 @@
     "hono": "catalog:",
     "node-pty": "^1.1.0",
     "sharp": "^0.33.0",
+    "better-sqlite3": "^11.7.0",
     "simple-git": "^3.32.3",
+    "sqlite-vec": "^0.1.6",
     "zod": "catalog:"
   },
   "devDependencies": {
