@@ -165,13 +165,13 @@ app.get(
 );
 
 // MCP Server setup
-const mcpServer = createMcpServer();
+const mcpServerPromise = createMcpServer();
 const mcpTransport = new StreamableHTTPTransport();
 
 let mcpConnectPromise: Promise<void> | null = null;
 function ensureMcpConnected() {
   if (!mcpConnectPromise) {
-    mcpConnectPromise = mcpServer.connect(mcpTransport);
+    mcpConnectPromise = mcpServerPromise.then((server) => server.connect(mcpTransport));
   }
   return mcpConnectPromise;
 }

@@ -524,7 +524,10 @@ Reply with only the guide text, no preamble or markdown headers.`;
   }
 }
 
-export function createMcpServer(): McpServer {
+export async function createMcpServer(): Promise<McpServer> {
+  const settings = await getSettings();
+  const maxTimeoutSeconds = Math.floor(settings.opencodeTimeoutMs / 1000);
+
   const mcpServer = new McpServer(
     {
       name: "kinetic-context",
@@ -533,6 +536,7 @@ export function createMcpServer(): McpServer {
     {
       capabilities: {
         tools: {},
+        logging: {},
       },
     },
   );
@@ -599,10 +603,10 @@ export function createMcpServer(): McpServer {
         .number()
         .optional()
         .describe(
-          "Optional timeout in seconds. Uses the configured default if not provided.",
+          `Optional timeout in seconds (max ${maxTimeoutSeconds}). Uses the configured default if not provided.`,
         ),
     },
-    async ({ identifier, query, timeout }): Promise<CallToolResult> => {
+    async ({ identifier, query, timeout }, extra): Promise<CallToolResult> => {
       const mcpCtx = getMcpContext();
 
       try {
@@ -691,13 +695,25 @@ export function createMcpServer(): McpServer {
           enrichedQuery += `\n\nPotentially relevant files:\n${ragContext}`;
         }
 
-        const result = await queryOpencode(
-          pkg.Repository.clonedPath,
-          enrichedQuery,
-          settings.opencodeUrl,
-          timeoutMs,
-          { packageId: pkg.id, ownerId: mcpCtx.userId },
-        );
+        const waitingInterval = setInterval(() => {
+          extra.sendNotification({
+            method: "notifications/message",
+            params: { level: "info", data: "Waiting...\n" },
+          }).catch(() => {});
+        }, 29000);
+
+        let result: { response: string; sessionId: string };
+        try {
+          result = await queryOpencode(
+            pkg.Repository.clonedPath,
+            enrichedQuery,
+            settings.opencodeUrl,
+            timeoutMs,
+            { packageId: pkg.id, ownerId: mcpCtx.userId },
+          );
+        } finally {
+          clearInterval(waitingInterval);
+        }
 
         // Fire-and-forget: generate helper text if missing
         if (!pkg.kctxHelper?.trim()) {
