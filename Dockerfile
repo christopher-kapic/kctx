@@ -29,7 +29,8 @@ COPY apps/web/package.json apps/web/
 COPY apps/server/package.json apps/server/
 
 # Install all dependencies (including devDependencies for building)
-RUN pnpm install --frozen-lockfile
+# Rebuild native modules (node-pty, better-sqlite3) to ensure they're compiled for linux
+RUN pnpm install --frozen-lockfile && pnpm rebuild
 
 # Copy all source code
 COPY packages packages
