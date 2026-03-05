@@ -76,3 +76,4 @@ kctx/
 - `pnpm run db:migrate`: Run database migrations
 - `pnpm run db:studio`: Open database studio UI
 - `pnpm run db:local`: Start the local SQLite database
+
