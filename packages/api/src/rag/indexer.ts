@@ -65,55 +65,63 @@ async function doIndex(
   repoPath: string,
   settings: EmbeddingSettings,
 ): Promise<void> {
-  const git = simpleGit(repoPath);
+  const heartbeat = setInterval(() => {
+    console.log(`[RAG] Still indexing ${repoId}...`);
+  }, 10_000);
 
-  // Get all tracked files
-  const lsOutput = await git.raw(["ls-files"]);
-  const files = lsOutput
-    .trim()
-    .split("\n")
-    .filter((f) => f && !shouldSkipFile(f));
+  try {
+    const git = simpleGit(repoPath);
 
-  // Read and chunk files
-  const allChunks: Array<{ filePath: string; text: string }> = [];
+    // Get all tracked files
+    const lsOutput = await git.raw(["ls-files"]);
+    const files = lsOutput
+      .trim()
+      .split("\n")
+      .filter((f) => f && !shouldSkipFile(f));
 
-  for (const file of files) {
-    try {
-      const fullPath = path.join(repoPath, file);
-      const content = await readFile(fullPath, "utf-8");
-      if (content.length > MAX_FILE_SIZE || content.length === 0) continue;
+    // Read and chunk files
+    const allChunks: Array<{ filePath: string; text: string }> = [];
 
-      const chunks = chunkText(content, file);
-      allChunks.push(...chunks);
-    } catch {
-      // Skip files that can't be read (binary, permissions, etc.)
-      continue;
+    for (const file of files) {
+      try {
+        const fullPath = path.join(repoPath, file);
+        const content = await readFile(fullPath, "utf-8");
+        if (content.length > MAX_FILE_SIZE || content.length === 0) continue;
+
+        const chunks = chunkText(content, file);
+        allChunks.push(...chunks);
+      } catch {
+        // Skip files that can't be read (binary, permissions, etc.)
+        continue;
+      }
     }
+
+    if (allChunks.length === 0) return;
+
+    // Generate embeddings
+    const texts = allChunks.map((c) => c.text);
+    const { embeddings, dimension } = await generateEmbeddings(texts, settings);
+
+    // Ensure the vec table exists with the right dimension
+    ensureVecTable(dimension);
+
+    // Clear existing chunks for this repo and insert new ones
+    deleteRepoChunks(repoId);
+
+    const chunksWithEmbeddings = allChunks.map((chunk, i) => ({
+      filePath: chunk.filePath,
+      text: chunk.text,
+      embedding: embeddings[i]!,
+    }));
+
+    insertChunks(repoId, chunksWithEmbeddings);
+
+    console.log(
+      `[RAG] Indexed ${repoId}: ${files.length} files, ${allChunks.length} chunks`,
+    );
+  } finally {
+    clearInterval(heartbeat);
   }
-
-  if (allChunks.length === 0) return;
-
-  // Generate embeddings
-  const texts = allChunks.map((c) => c.text);
-  const { embeddings, dimension } = await generateEmbeddings(texts, settings);
-
-  // Ensure the vec table exists with the right dimension
-  ensureVecTable(dimension);
-
-  // Clear existing chunks for this repo and insert new ones
-  deleteRepoChunks(repoId);
-
-  const chunksWithEmbeddings = allChunks.map((chunk, i) => ({
-    filePath: chunk.filePath,
-    text: chunk.text,
-    embedding: embeddings[i]!,
-  }));
-
-  insertChunks(repoId, chunksWithEmbeddings);
-
-  console.log(
-    `[RAG] Indexed ${repoId}: ${files.length} files, ${allChunks.length} chunks`,
-  );
 }
 
 /**
