@@ -58,7 +58,6 @@ COPY --from=builder /app/packages/db/node_modules ./packages/db/node_modules
 COPY --from=builder /app/packages/auth/node_modules ./packages/auth/node_modules
 COPY --from=builder /app/packages/api/node_modules ./packages/api/node_modules
 COPY --from=builder /app/packages/env/node_modules ./packages/env/node_modules
-COPY --from=builder /app/packages/config/node_modules ./packages/config/node_modules
 COPY --from=builder /app/apps/server/node_modules ./apps/server/node_modules
 COPY --from=builder /app/apps/web/node_modules ./apps/web/node_modules
 
