@@ -14,6 +14,16 @@ import { toast } from "sonner";
 
 import { authClient } from "@/lib/auth-client";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -297,6 +307,57 @@ function UpdateRepoButton({
 }
 
 function EmbeddingStatusBadge({ repo }: { repo: RepoItem }) {
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const reindexMutation = useMutation({
+    mutationFn: () => client.repository.reindex({ id: repo.id }),
+    onSuccess: () => {
+      toast.success(`Indexing started for ${repo.orgOrUser}/${repo.repoName}`);
+      queryClient.invalidateQueries({
+        queryKey: orpc.repository.list.queryOptions({}).queryKey,
+      });
+    },
+    onError: (error) => {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to start indexing",
+      );
+    },
+  });
+
+  const indexButton = (
+    <>
+      <button
+        type="button"
+        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer underline-offset-2 hover:underline"
+        onClick={() => setShowConfirm(true)}
+      >
+        <Database className="size-3" />
+        Not indexed
+      </button>
+      <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Index repository?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will generate embeddings for{" "}
+              <strong>{repo.orgOrUser}/{repo.repoName}</strong> using your
+              configured embedding provider. This may incur API costs depending
+              on the repository size.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => reindexMutation.mutate()}
+            >
+              Start indexing
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+
   switch (repo.embeddingStatus) {
     case "INDEXING":
       return (
@@ -314,21 +375,41 @@ function EmbeddingStatusBadge({ repo }: { repo: RepoItem }) {
       );
     case "FAILED":
       return (
-        <span
-          className="inline-flex items-center gap-1 text-xs text-red-600"
-          title={repo.embeddingError ?? "Unknown error"}
-        >
-          <AlertCircle className="size-3" />
-          Failed
-        </span>
+        <>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-800 cursor-pointer underline-offset-2 hover:underline"
+            title={repo.embeddingError ?? "Unknown error"}
+            onClick={() => setShowConfirm(true)}
+          >
+            <AlertCircle className="size-3" />
+            Failed
+          </button>
+          <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Retry indexing?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Previous indexing of{" "}
+                  <strong>{repo.orgOrUser}/{repo.repoName}</strong> failed
+                  {repo.embeddingError ? `: ${repo.embeddingError}` : "."}{" "}
+                  Would you like to try again?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => reindexMutation.mutate()}
+                >
+                  Retry indexing
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
       );
     default:
-      return (
-        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-          <Database className="size-3" />
-          Not indexed
-        </span>
-      );
+      return indexButton;
   }
 }
 

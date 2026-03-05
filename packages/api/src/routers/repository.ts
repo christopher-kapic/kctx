@@ -221,7 +221,11 @@ export const repositoryRouter = {
         input.sshPrivateKey,
       );
 
-      if (changed) {
+      const needsIndex =
+        repo.embeddingStatus === "NOT_INDEXED" ||
+        repo.embeddingStatus === "FAILED";
+
+      if (changed || needsIndex) {
         await triggerReindex(repo.id, repo.clonedPath, headCommit);
       }
 
@@ -292,7 +296,11 @@ export const repositoryRouter = {
             sshKey,
           );
 
-          if (changed) {
+          const needsIndex =
+            repo.embeddingStatus === "NOT_INDEXED" ||
+            repo.embeddingStatus === "FAILED";
+
+          if (changed || needsIndex) {
             await triggerReindex(repo.id, repo.clonedPath, headCommit);
           }
 
@@ -313,6 +321,47 @@ export const repositoryRouter = {
       }
 
       return { results };
+    }),
+
+  reindex: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .handler(async ({ input }) => {
+      const repo = await prisma.repository.findUnique({
+        where: { id: input.id },
+      });
+      if (!repo) {
+        throw new ORPCError("NOT_FOUND", { message: "Repository not found" });
+      }
+      if (!repo.clonedPath) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Repository has no cloned path",
+        });
+      }
+
+      const settings = await prisma.siteSettings.upsert({
+        where: { id: "default" },
+        create: { id: "default" },
+        update: {},
+      });
+
+      if (!isEmbeddingConfigured(settings)) {
+        throw new ORPCError("BAD_REQUEST", {
+          message:
+            "Embedding settings are not configured. Configure them in the admin settings page.",
+        });
+      }
+
+      const git = simpleGit(repo.clonedPath);
+      const headCommit = (await git.revparse(["HEAD"])).trim();
+
+      // Fire-and-forget
+      indexRepository(repo.id, repo.clonedPath, headCommit, settings).catch(
+        (err) => {
+          console.error(`[RAG] Reindex failed for ${repo.id}:`, err);
+        },
+      );
+
+      return { success: true };
     }),
 
   delete: protectedProcedure
