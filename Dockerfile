@@ -1,20 +1,25 @@
 # Multi-stage build for kinetic-context (kctx)
 
-# Stage 1: Base image with system dependencies
-FROM node:20-slim AS base
+# Stage 1: Runtime base (no build tools)
+FROM node:20-slim AS runtime-base
 
-# Install openssl (required by Prisma), git (required for cloning repos at runtime),
-# and build tools (required for node-pty native compilation)
+# Install openssl (required by Prisma) and git (required for cloning repos at runtime)
 RUN apt-get update -y && apt-get install -y \
   openssl libssl-dev git \
-  build-essential g++ python3 make \
   && rm -rf /var/lib/apt/lists/*
 
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@10.20.0 --activate
 
-# Stage 2: Build
-FROM base AS builder
+# Stage 2: Build base (adds build tools for native module compilation)
+FROM runtime-base AS build-base
+
+RUN apt-get update -y && apt-get install -y \
+  build-essential g++ python3 make \
+  && rm -rf /var/lib/apt/lists/*
+
+# Stage 3: Build
+FROM build-base AS builder
 
 WORKDIR /app
 
@@ -45,14 +50,11 @@ RUN pnpm build
 # Verify build outputs
 RUN test -f apps/server/dist/index.mjs && test -d apps/web/dist
 
-# Stage 3: Runtime
-FROM base AS runner
-
-ENV NODE_ENV=production
+# Stage 4: Production dependencies (needs build tools for native modules like node-pty)
+FROM build-base AS prod-deps
 
 WORKDIR /app
 
-# Copy workspace config for pnpm install
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY packages/db/package.json packages/db/
 COPY packages/auth/package.json packages/auth/
@@ -62,8 +64,30 @@ COPY packages/config/package.json packages/config/
 COPY apps/server/package.json apps/server/
 COPY apps/web/package.json apps/web/
 
-# Install production dependencies only
 RUN pnpm install --frozen-lockfile --prod
+
+# Stage 5: Runtime (clean image, no build tools)
+FROM runtime-base AS runner
+
+ENV NODE_ENV=production
+
+WORKDIR /app
+
+# Copy workspace config (needed for pnpm --filter @kctx/db db:push)
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+COPY packages/db/package.json packages/db/
+COPY packages/auth/package.json packages/auth/
+COPY packages/api/package.json packages/api/
+COPY packages/env/package.json packages/env/
+COPY packages/config/package.json packages/config/
+COPY apps/server/package.json apps/server/
+COPY apps/web/package.json apps/web/
+
+# Copy production node_modules from prod-deps stage (native modules already compiled)
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=prod-deps /app/apps/server/node_modules ./apps/server/node_modules
+COPY --from=prod-deps /app/apps/web/node_modules ./apps/web/node_modules
+COPY --from=prod-deps /app/packages/db/node_modules ./packages/db/node_modules
 
 # Install opencode CLI (needed for terminal feature)
 RUN npm i -g opencode-ai
