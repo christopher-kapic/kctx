@@ -210,54 +210,82 @@ async function queryOpencode(
   // Read configured model
   const model = await getModelFromConfig();
 
-  // Send prompt — OpenCode streams the response, so the SDK resolves once the
-  // full assistant message is ready.  If the stream closes without data (e.g.
-  // OpenCode's prompt handler threw internally), promptResult will be null/empty.
-  const promptResult = await withTimeout(
-    client.session.prompt({
-      path: { id: sessionId },
-      body: {
-        parts: [{ type: "text" as const, text: query }],
-        agent: "kinetic-context",
-        ...(model ? { model } : {}),
-      },
-    }),
-    fetchTimeout,
-    `Prompt send timed out after ${fetchTimeout}ms`,
-  ) as { error?: { message?: string }; data?: { parts?: Array<{ type?: string; text?: string }> } } | null | undefined;
+  // Send prompt with retry logic.  OpenCode streams the response, so the SDK
+  // resolves once the full assistant message is ready.  If the stream closes
+  // without data (OpenCode's prompt handler threw internally), we retry with a
+  // fresh session up to 3 times before giving up.
+  const MAX_PROMPT_RETRIES = 3;
+  let currentSessionId = sessionId;
 
-  if (promptResult?.error) {
-    throw new Error(
-      `Failed to send OpenCode prompt: ${promptResult.error?.message || "Unknown error"}`,
-    );
-  }
+  for (let attempt = 1; attempt <= MAX_PROMPT_RETRIES; attempt++) {
+    const promptResult = await withTimeout(
+      client.session.prompt({
+        path: { id: currentSessionId },
+        body: {
+          parts: [{ type: "text" as const, text: query }],
+          agent: "kinetic-context",
+          ...(model ? { model } : {}),
+        },
+      }),
+      fetchTimeout,
+      `Prompt send timed out after ${fetchTimeout}ms`,
+    ) as { error?: { message?: string }; data?: { parts?: Array<{ type?: string; text?: string }> } } | null | undefined;
 
-  // If OpenCode returned an empty response (stream closed without data), its
-  // prompt handler likely threw before the processing loop started.  Log this
-  // prominently so it's diagnosable, but still fall through to polling in case
-  // the session is processing asynchronously.
-  if (!promptResult || !promptResult.data) {
-    console.warn(
-      `[MCP] OpenCode returned empty response for session ${sessionId} — ` +
-      `prompt handler may have errored internally. Will attempt polling.`,
-    );
-  }
-
-  // Check for immediate response
-  if (promptResult?.data?.parts && Array.isArray(promptResult.data.parts)) {
-    const textParts = promptResult.data.parts.filter(
-      (p): p is { type: "text"; text: string } =>
-        p.type === "text" && typeof p.text === "string",
-    );
-    const lastPart = textParts[textParts.length - 1];
-    if (lastPart) {
-      if (options?.packageId && options?.ownerId) {
-        await prisma.chatMessage.create({
-          data: { conversationId: sessionId, role: "assistant", content: lastPart.text },
-        }).catch(() => {});
-      }
-      return { response: lastPart.text, sessionId };
+    if (promptResult?.error) {
+      throw new Error(
+        `Failed to send OpenCode prompt: ${promptResult.error?.message || "Unknown error"}`,
+      );
     }
+
+    // Check for immediate response
+    if (promptResult?.data?.parts && Array.isArray(promptResult.data.parts)) {
+      const textParts = promptResult.data.parts.filter(
+        (p): p is { type: "text"; text: string } =>
+          p.type === "text" && typeof p.text === "string",
+      );
+      const lastPart = textParts[textParts.length - 1];
+      if (lastPart) {
+        if (options?.packageId && options?.ownerId) {
+          await prisma.chatMessage.create({
+            data: { conversationId: sessionId, role: "assistant", content: lastPart.text },
+          }).catch(() => {});
+        }
+        return { response: lastPart.text, sessionId };
+      }
+    }
+
+    // Empty response — OpenCode's prompt handler likely threw before the
+    // processing loop started.
+    if (!promptResult || !promptResult.data) {
+      if (attempt < MAX_PROMPT_RETRIES) {
+        console.warn(
+          `[MCP] OpenCode returned empty response for session ${currentSessionId} ` +
+          `(attempt ${attempt}/${MAX_PROMPT_RETRIES}). Retrying with new session...`,
+        );
+        // Create a fresh session for the retry since the failed one is in a bad state
+        const retryResult = await withTimeout(
+          client.session.create({
+            body: { title: `Query: ${query.substring(0, 50)}` },
+          }),
+          fetchTimeout,
+          "Retry session creation timed out",
+        ) as { error?: { message?: string }; data?: { id: string } };
+
+        if (retryResult.error || !retryResult.data) {
+          console.error(`[MCP] Failed to create retry session: ${retryResult.error?.message || "Unknown error"}`);
+          break; // Fall through to polling on the original session
+        }
+        currentSessionId = retryResult.data.id;
+        continue;
+      }
+      console.warn(
+        `[MCP] OpenCode returned empty response for session ${currentSessionId} ` +
+        `(attempt ${attempt}/${MAX_PROMPT_RETRIES}). Falling through to polling.`,
+      );
+    }
+
+    // Got a non-empty response but no text parts — fall through to polling
+    break;
   }
 
   // Poll for assistant response using the SDK.
@@ -272,7 +300,7 @@ async function queryOpencode(
 
     try {
       const messagesRes = await fetch(
-        `${opencodeUrl}/session/${encodeURIComponent(sessionId)}/message?limit=5`,
+        `${opencodeUrl}/session/${encodeURIComponent(currentSessionId)}/message?limit=5`,
         { headers: { "x-opencode-directory": repoPath } },
       );
 
@@ -311,7 +339,7 @@ async function queryOpencode(
         idleWithNoAssistant++;
         if (idleWithNoAssistant >= 5) {
           throw new Error(
-            `OpenCode session ${sessionId} has no assistant response after ${idleWithNoAssistant * pollInterval / 1000}s of polling. ` +
+            `OpenCode session ${currentSessionId} has no assistant response after ${idleWithNoAssistant * pollInterval / 1000}s of polling. ` +
             `The prompt handler likely failed internally. Check OpenCode logs for errors.`,
           );
         }
