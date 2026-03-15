@@ -68,8 +68,12 @@ function TerminalPage() {
         if (msg.type === "session") {
           console.log("[terminal] Session established:", msg.id);
           sessionIdRef.current = msg.id;
+        } else if (msg.type === "clipboard") {
+          // OSC 52 clipboard passthrough: write to the user's system clipboard
+          navigator.clipboard.writeText(msg.text).catch((err) => {
+            console.warn("[terminal] Clipboard write failed:", err);
+          });
         } else if (msg.type === "data") {
-          console.log(`[terminal] Received data (${msg.content.length} chars)`);
           term.write(msg.content);
         } else if (msg.type === "exit") {
           console.log("[terminal] Process exited:", msg.code);
@@ -138,7 +142,7 @@ function TerminalPage() {
       </div>
       <div
         ref={terminalRef}
-        className="flex-1 bg-[#09090b] p-2"
+        className="flex-1 bg-[#09090b]"
         style={{ minHeight: 0 }}
       />
     </div>

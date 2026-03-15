@@ -17,8 +17,31 @@ const TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 // Strip DECRQM (request mode) sequences that crash xterm.js 6.0.0's minified bundle.
 // OpenCode sends these to probe terminal capabilities; it falls back gracefully without responses.
 const DECRQM_RE = /\x1b\[\??\d+\$p/g;
-function sanitizePtyOutput(data: string): string {
-  return data.replace(DECRQM_RE, "");
+
+// Match OSC 52 clipboard sequences: ESC ] 52 ; <target> ; <base64> BEL/ST
+// Also handles tmux passthrough wrapping: ESC Ptmux; ESC <osc52> ESC \
+const OSC52_RE = /(?:\x1bPtmux;\x1b)?\x1b\]52;[a-z]*;([A-Za-z0-9+/=]*)\x07(?:\x1b\\)?/g;
+
+interface SanitizeResult {
+  data: string;
+  clipboardText?: string;
+}
+
+function sanitizePtyOutput(data: string): SanitizeResult {
+  // Extract OSC 52 clipboard content before stripping
+  let clipboardText: string | undefined;
+  const osc52Match = OSC52_RE.exec(data);
+  if (osc52Match?.[1]) {
+    try {
+      clipboardText = Buffer.from(osc52Match[1], "base64").toString("utf-8");
+    } catch {
+      // Invalid base64, ignore
+    }
+  }
+  OSC52_RE.lastIndex = 0; // Reset regex state
+
+  const cleaned = data.replace(OSC52_RE, "").replace(DECRQM_RE, "");
+  return { data: cleaned, clipboardText };
 }
 
 export function createSession(userId: string, ws: WSContext): string {
@@ -45,10 +68,17 @@ export function createSession(userId: string, ws: WSContext): string {
     const session = sessions.get(sessionId);
     if (session) {
       session.lastActivity = new Date();
-      const sanitized = sanitizePtyOutput(data);
-      if (sanitized.length === 0) return;
-      console.log(`[terminal] PTY data (${sanitized.length} chars): ${JSON.stringify(sanitized.slice(0, 200))}`);
-      session.ws.send(JSON.stringify({ type: "data", content: sanitized }));
+      const result = sanitizePtyOutput(data);
+
+      // Forward clipboard content as a separate message so the browser can
+      // write it to the user's system clipboard via the Clipboard API.
+      if (result.clipboardText) {
+        session.ws.send(JSON.stringify({ type: "clipboard", text: result.clipboardText }));
+      }
+
+      if (result.data.length === 0) return;
+      console.log(`[terminal] PTY data (${result.data.length} chars): ${JSON.stringify(result.data.slice(0, 200))}`);
+      session.ws.send(JSON.stringify({ type: "data", content: result.data }));
     }
   });
 
