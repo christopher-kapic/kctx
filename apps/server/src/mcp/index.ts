@@ -210,7 +210,9 @@ async function queryOpencode(
   // Read configured model
   const model = await getModelFromConfig();
 
-  // Send prompt
+  // Send prompt — OpenCode streams the response, so the SDK resolves once the
+  // full assistant message is ready.  If the stream closes without data (e.g.
+  // OpenCode's prompt handler threw internally), promptResult will be null/empty.
   const promptResult = await withTimeout(
     client.session.prompt({
       path: { id: sessionId },
@@ -222,16 +224,27 @@ async function queryOpencode(
     }),
     fetchTimeout,
     `Prompt send timed out after ${fetchTimeout}ms`,
-  ) as { error?: { message?: string }; data?: { parts?: Array<{ type?: string; text?: string }> } };
+  ) as { error?: { message?: string }; data?: { parts?: Array<{ type?: string; text?: string }> } } | null | undefined;
 
-  if (promptResult.error) {
+  if (promptResult?.error) {
     throw new Error(
       `Failed to send OpenCode prompt: ${promptResult.error?.message || "Unknown error"}`,
     );
   }
 
+  // If OpenCode returned an empty response (stream closed without data), its
+  // prompt handler likely threw before the processing loop started.  Log this
+  // prominently so it's diagnosable, but still fall through to polling in case
+  // the session is processing asynchronously.
+  if (!promptResult || !promptResult.data) {
+    console.warn(
+      `[MCP] OpenCode returned empty response for session ${sessionId} — ` +
+      `prompt handler may have errored internally. Will attempt polling.`,
+    );
+  }
+
   // Check for immediate response
-  if (promptResult.data?.parts && Array.isArray(promptResult.data.parts)) {
+  if (promptResult?.data?.parts && Array.isArray(promptResult.data.parts)) {
     const textParts = promptResult.data.parts.filter(
       (p): p is { type: "text"; text: string } =>
         p.type === "text" && typeof p.text === "string",
@@ -247,9 +260,12 @@ async function queryOpencode(
     }
   }
 
-  // Poll for assistant response using the SDK
+  // Poll for assistant response using the SDK.
+  // Also check session status — if OpenCode reports idle with no assistant
+  // message, the prompt handler failed and polling further is pointless.
   const pollInterval = 2000;
   const maxAttempts = Math.ceil(timeoutMs / pollInterval);
+  let idleWithNoAssistant = 0;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     await new Promise((resolve) => setTimeout(resolve, pollInterval));
@@ -284,8 +300,26 @@ async function queryOpencode(
           }
           return { response: lastPart.text, sessionId };
         }
+        // Assistant message exists but has no text yet — still processing
+        idleWithNoAssistant = 0;
+      } else {
+        // No assistant message at all.  This is safe to bail on because OpenCode
+        // creates the assistant message BEFORE calling the LLM (prompt.ts:571-595).
+        // So if the LLM is merely slow, the assistant message would already exist
+        // (just with empty text parts).  No assistant message means the processing
+        // loop never started — the prompt handler threw before reaching that point.
+        idleWithNoAssistant++;
+        if (idleWithNoAssistant >= 5) {
+          throw new Error(
+            `OpenCode session ${sessionId} has no assistant response after ${idleWithNoAssistant * pollInterval / 1000}s of polling. ` +
+            `The prompt handler likely failed internally. Check OpenCode logs for errors.`,
+          );
+        }
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("no assistant response")) {
+        throw error;
+      }
       continue;
     }
   }
