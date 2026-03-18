@@ -154,6 +154,71 @@ async function getAgentPrompt(repoPath: string, kctxHelper?: string): Promise<st
   return prompt;
 }
 
+/**
+ * Try to fetch error details from an OpenCode session.
+ * Returns a descriptive error string if available, or undefined if no error found.
+ */
+async function getSessionError(
+  opencodeUrl: string,
+  sessionId: string,
+  repoPath: string,
+): Promise<string | undefined> {
+  try {
+    // Check session messages for error indicators
+    const messagesRes = await fetch(
+      `${opencodeUrl}/session/${encodeURIComponent(sessionId)}/message?limit=10`,
+      { headers: { "x-opencode-directory": repoPath } },
+    );
+    if (!messagesRes.ok) return undefined;
+
+    const messages = (await messagesRes.json()) as Array<{
+      info?: { role?: string };
+      parts?: Array<{ type?: string; text?: string; error?: string }>;
+      error?: string | { message?: string };
+    }>;
+
+    if (!Array.isArray(messages)) return undefined;
+
+    for (const msg of messages) {
+      // Check for error field on message
+      if (msg.error) {
+        return typeof msg.error === "string"
+          ? msg.error
+          : msg.error.message || JSON.stringify(msg.error);
+      }
+      // Check for error parts
+      if (msg.parts) {
+        for (const part of msg.parts) {
+          if (part.error) return part.error;
+          if (part.type === "text" && part.text && /model.*not (available|found)|provider.*error|invalid.*model/i.test(part.text)) {
+            return part.text;
+          }
+        }
+      }
+    }
+
+    // Check session status directly
+    const sessionRes = await fetch(
+      `${opencodeUrl}/session/${encodeURIComponent(sessionId)}`,
+      { headers: { "x-opencode-directory": repoPath } },
+    );
+    if (sessionRes.ok) {
+      const session = (await sessionRes.json()) as {
+        error?: string | { message?: string };
+        status?: string;
+      };
+      if (session.error) {
+        return typeof session.error === "string"
+          ? session.error
+          : session.error.message || JSON.stringify(session.error);
+      }
+    }
+  } catch {
+    // Best-effort — don't throw
+  }
+  return undefined;
+}
+
 async function queryOpencode(
   repoPath: string,
   query: string,
@@ -232,8 +297,9 @@ async function queryOpencode(
     ) as { error?: { message?: string }; data?: { parts?: Array<{ type?: string; text?: string }> } } | null | undefined;
 
     if (promptResult?.error) {
+      const errorMsg = promptResult.error?.message || "Unknown error";
       throw new Error(
-        `Failed to send OpenCode prompt: ${promptResult.error?.message || "Unknown error"}`,
+        `Failed to send OpenCode prompt: ${errorMsg}. If the selected model is not available, check your kctx model/provider configuration.`,
       );
     }
 
@@ -255,8 +321,17 @@ async function queryOpencode(
     }
 
     // Empty response — OpenCode's prompt handler likely threw before the
-    // processing loop started.
+    // processing loop started.  Check for a session-level error (e.g. model
+    // not available) so we can surface it immediately instead of retrying or
+    // timing out.
     if (!promptResult || !promptResult.data) {
+      const sessionError = await getSessionError(opencodeUrl, currentSessionId, repoPath);
+      if (sessionError) {
+        throw new Error(
+          `OpenCode error: ${sessionError}. Check your kctx model/provider configuration.`,
+        );
+      }
+
       if (attempt < MAX_PROMPT_RETRIES) {
         console.warn(
           `[MCP] OpenCode returned empty response for session ${currentSessionId} ` +
@@ -338,10 +413,12 @@ async function queryOpencode(
         // loop never started — the prompt handler threw before reaching that point.
         idleWithNoAssistant++;
         if (idleWithNoAssistant >= 5) {
-          throw new Error(
-            `OpenCode session ${currentSessionId} has no assistant response after ${idleWithNoAssistant * pollInterval / 1000}s of polling. ` +
-            `The prompt handler likely failed internally. Check OpenCode logs for errors.`,
-          );
+          const sessionError = await getSessionError(opencodeUrl, currentSessionId, repoPath);
+          const detail = sessionError
+            ? `OpenCode error: ${sessionError}. Check your kctx model/provider configuration.`
+            : `OpenCode session ${currentSessionId} has no assistant response after ${idleWithNoAssistant * pollInterval / 1000}s of polling. ` +
+              `The prompt handler likely failed internally. Check OpenCode logs for errors.`;
+          throw new Error(detail);
         }
       }
     } catch (error) {
