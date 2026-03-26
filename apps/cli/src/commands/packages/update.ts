@@ -63,6 +63,22 @@ export const packagesUpdateCommand = defineCommand({
             defaultValue: pkg.displayName,
             placeholder: pkg.displayName,
           }),
+        packageManager: () =>
+          p.select({
+            message: "Package manager",
+            initialValue: pkg.packageManager,
+            options: [
+              { value: "npm", label: "npm" },
+              { value: "pnpm", label: "pnpm" },
+              { value: "yarn", label: "yarn" },
+              { value: "pip", label: "pip" },
+              { value: "cargo", label: "cargo" },
+              { value: "go", label: "go" },
+              { value: "gem", label: "gem" },
+              { value: "maven", label: "maven" },
+              { value: "other", label: "other" },
+            ],
+          }),
         defaultTag: () =>
           p.text({
             message: "Default tag",
@@ -91,6 +107,7 @@ export const packagesUpdateCommand = defineCommand({
       await client.package.update({
         id: packageId,
         displayName: values.displayName as string,
+        packageManager: values.packageManager as string,
         defaultTag: values.defaultTag as string,
         kctxHelper: (values.kctxHelper as string) || null,
       });

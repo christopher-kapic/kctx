@@ -608,6 +608,7 @@ function EditPackageSheet({
     mutationFn: (input: {
       id: string;
       displayName?: string;
+      packageManager?: string;
       defaultTag?: string;
       kctxHelper?: string | null;
       urls?: Record<string, string>;
@@ -627,6 +628,7 @@ function EditPackageSheet({
   const form = useForm({
     defaultValues: {
       displayName: pkg.displayName,
+      packageManager: pkg.packageManager,
       defaultTag: pkg.defaultTag,
       kctxHelper: pkg.kctxHelper ?? "",
       gitBrowser: existingUrls.gitBrowser,
@@ -637,6 +639,7 @@ function EditPackageSheet({
       updateMutation.mutate({
         id: pkg.id,
         displayName: value.displayName,
+        packageManager: value.packageManager,
         defaultTag: value.defaultTag,
         kctxHelper: value.kctxHelper || null,
         urls: buildUrls(value.gitBrowser, value.website, value.docs),
@@ -645,6 +648,7 @@ function EditPackageSheet({
     validators: {
       onSubmit: z.object({
         displayName: z.string().min(1, "Display name is required"),
+        packageManager: z.string().min(1, "Package manager is required"),
         defaultTag: z.string().min(1, "Default branch is required"),
         kctxHelper: z.string(),
         gitBrowser: z.string(),
@@ -688,6 +692,29 @@ function EditPackageSheet({
                     {error?.message}
                   </p>
                 ))}
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field name="packageManager">
+            {(field) => (
+              <div className="space-y-1.5">
+                <Label>Package Manager</Label>
+                <Select
+                  value={field.state.value}
+                  onValueChange={(value) => field.handleChange(value ?? field.state.value)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select package manager" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PACKAGE_MANAGERS.map((pm) => (
+                      <SelectItem key={pm} value={pm}>
+                        {pm}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
           </form.Field>
