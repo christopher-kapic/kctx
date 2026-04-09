@@ -8,6 +8,7 @@ import {
   Loader2,
   AlertCircle,
   Database,
+  Trash2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -33,6 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -62,6 +64,7 @@ type RepoItem = {
   updatedAt: string;
   embeddingStatus: string;
   embeddingError: string | null;
+  clonedPath: string | null;
   _count: { Packages: number };
 };
 
@@ -413,10 +416,121 @@ function EmbeddingStatusBadge({ repo }: { repo: RepoItem }) {
   }
 }
 
+function DeleteRepoDialog({
+  repo,
+  open,
+  onOpenChange,
+}: {
+  repo: RepoItem;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const fullName = `${repo.orgOrUser}/${repo.repoName}`;
+  const [confirmText, setConfirmText] = useState("");
+  const [removeFiles, setRemoveFiles] = useState(false);
+
+  const deleteMutation = useMutation({
+    mutationFn: () =>
+      client.repository.delete({ id: repo.id, removeFiles }),
+    onSuccess: () => {
+      toast.success(`Deleted ${fullName}`);
+      queryClient.invalidateQueries({
+        queryKey: orpc.repository.list.queryOptions({}).queryKey,
+      });
+      onOpenChange(false);
+    },
+    onError: (error) => {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete repository",
+      );
+    },
+  });
+
+  const hasPackages = repo._count.Packages > 0;
+  const canDelete = !hasPackages && confirmText === fullName;
+
+  return (
+    <AlertDialog
+      open={open}
+      onOpenChange={(open) => {
+        if (!open) {
+          setConfirmText("");
+          setRemoveFiles(false);
+        }
+        onOpenChange(open);
+      }}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Repository</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will permanently delete the repository{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs font-medium">
+              {fullName}
+            </code>
+            {" "}from Kinetic Context.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        {hasPackages ? (
+          <div className="rounded border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
+            This repository has {repo._count.Packages} linked package
+            {repo._count.Packages === 1 ? "" : "s"}. Remove the package
+            {repo._count.Packages === 1 ? "" : "s"} first before deleting the
+            repository.
+          </div>
+        ) : (
+          <>
+            <div className="space-y-1.5">
+              <Label htmlFor="confirm-delete-repo">
+                Type{" "}
+                <code className="rounded bg-muted px-1 py-0.5 text-xs font-medium">
+                  {fullName}
+                </code>{" "}
+                to confirm
+              </Label>
+              <Input
+                id="confirm-delete-repo"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                placeholder={fullName}
+              />
+            </div>
+            {repo.clonedPath && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="remove-files"
+                  checked={removeFiles}
+                  onChange={(e) => setRemoveFiles(e.target.checked)}
+                  className="size-4 rounded border"
+                />
+                <Label htmlFor="remove-files" className="text-xs font-normal">
+                  Also delete cloned files from disk
+                </Label>
+              </div>
+            )}
+          </>
+        )}
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            disabled={!canDelete || deleteMutation.isPending}
+            onClick={() => deleteMutation.mutate()}
+          >
+            {deleteMutation.isPending ? "Deleting..." : "Delete"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 function RepositoriesPage() {
   const { isAdmin } = Route.useRouteContext();
   const reposQuery = useQuery(orpc.repository.list.queryOptions({}));
   const sshQuery = useQuery(orpc.settings.sshEnabled.queryOptions({}));
+  const [deleteRepo, setDeleteRepo] = useState<RepoItem | null>(null);
 
   const sshEnabled = sshQuery.data?.sshCloningEnabled ?? true;
 
@@ -472,7 +586,7 @@ function RepositoriesPage() {
                 <TableHead>Last Updated</TableHead>
                 <TableHead>Packages</TableHead>
                 <TableHead>Embedding</TableHead>
-                {isAdmin && <TableHead className="w-20" />}
+                {isAdmin && <TableHead className="w-24" />}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -513,10 +627,20 @@ function RepositoriesPage() {
                     </TableCell>
                     {isAdmin && (
                       <TableCell>
-                        <UpdateRepoButton
-                          repo={r}
-                          sshEnabled={sshEnabled}
-                        />
+                        <div className="flex items-center gap-1">
+                          <UpdateRepoButton
+                            repo={r}
+                            sshEnabled={sshEnabled}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => setDeleteRepo(r)}
+                          >
+                            <Trash2 className="size-3.5" />
+                            <span className="sr-only">Delete</span>
+                          </Button>
+                        </div>
                       </TableCell>
                     )}
                   </TableRow>
@@ -525,6 +649,17 @@ function RepositoriesPage() {
             </TableBody>
           </Table>
         </div>
+      )}
+
+      {deleteRepo && (
+        <DeleteRepoDialog
+          key={deleteRepo.id}
+          repo={deleteRepo}
+          open={!!deleteRepo}
+          onOpenChange={(open) => {
+            if (!open) setDeleteRepo(null);
+          }}
+        />
       )}
     </div>
   );

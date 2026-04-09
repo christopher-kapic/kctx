@@ -155,16 +155,12 @@ export const repositoryRouter = {
         sshPrivateKey,
       })
         .then(async () => {
-          const detectedBranch = await getDefaultBranch(clonedPath);
           await prisma.repository.update({
             where: { id: repo.id },
             data: { cloneStatus: "READY" },
           });
           // Update default branch on all linked packages
-          await prisma.package.updateMany({
-            where: { repositoryId: repo.id },
-            data: { defaultTag: detectedBranch },
-          });
+          await syncDefaultBranchToPackages(repo.id, clonedPath);
         })
         .catch(async (error) => {
           console.error(`Background clone failed for ${repo.id}:`, error);
@@ -220,6 +216,9 @@ export const repositoryRouter = {
         repo.clonedPath,
         input.sshPrivateKey,
       );
+
+      // Re-sync default branch in case it changed upstream
+      await syncDefaultBranchToPackages(repo.id, repo.clonedPath);
 
       const needsIndex =
         repo.embeddingStatus === "NOT_INDEXED" ||
@@ -296,6 +295,9 @@ export const repositoryRouter = {
             sshKey,
           );
 
+          // Re-sync default branch in case it changed upstream
+          await syncDefaultBranchToPackages(repo.id, repo.clonedPath);
+
           results.push({
             id: repo.id,
             repoName: `${repo.orgOrUser}/${repo.repoName}`,
@@ -356,7 +358,7 @@ export const repositoryRouter = {
       return { success: true };
     }),
 
-  delete: protectedProcedure
+  delete: adminProcedure
     .input(
       z.object({
         id: z.string(),
@@ -530,6 +532,19 @@ async function pullAndCheckChanges(
     changed: beforeHead !== afterHead,
     headCommit: afterHead,
   };
+}
+
+/** Detect the default branch and propagate it to all linked packages */
+async function syncDefaultBranchToPackages(
+  repoId: string,
+  clonedPath: string,
+): Promise<string> {
+  const detectedBranch = await getDefaultBranch(clonedPath);
+  await prisma.package.updateMany({
+    where: { repositoryId: repoId },
+    data: { defaultTag: detectedBranch },
+  });
+  return detectedBranch;
 }
 
 /** Fire-and-forget reindex if embedding is configured */
