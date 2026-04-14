@@ -15,6 +15,7 @@ function TerminalPage() {
   const wsRef = useRef<WebSocket | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const lastInputAtRef = useRef(0);
 
   const connect = useCallback(() => {
     if (!terminalRef.current) return;
@@ -31,6 +32,7 @@ function TerminalPage() {
       cursorBlink: true,
       fontSize: 14,
       fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+      scrollback: 5000,
       theme: {
         background: "#09090b",
         foreground: "#fafafa",
@@ -69,10 +71,15 @@ function TerminalPage() {
           console.log("[terminal] Session established:", msg.id);
           sessionIdRef.current = msg.id;
         } else if (msg.type === "clipboard") {
-          // OSC 52 clipboard passthrough: write to the user's system clipboard
-          navigator.clipboard.writeText(msg.text).catch((err) => {
-            console.warn("[terminal] Clipboard write failed:", err);
-          });
+          // OSC 52 clipboard passthrough: only honor if the terminal is focused
+          // and the user pressed a key recently. Otherwise background PTY
+          // output can silently overwrite whatever the user just copied.
+          const recentInput = Date.now() - lastInputAtRef.current < 3000;
+          if (document.hasFocus() && recentInput) {
+            navigator.clipboard.writeText(msg.text).catch((err) => {
+              console.warn("[terminal] Clipboard write failed:", err);
+            });
+          }
         } else if (msg.type === "data") {
           term.write(msg.content);
         } else if (msg.type === "exit") {
@@ -96,6 +103,7 @@ function TerminalPage() {
 
     // Send user input to WebSocket
     term.onData((data) => {
+      lastInputAtRef.current = Date.now();
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: "input", data }));
       }
