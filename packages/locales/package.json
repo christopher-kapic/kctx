@@ -1,0 +1,23 @@
+{
+  "name": "@starter/locales",
+  "license": "UNLICENSED",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./native": "./src/native.ts",
+    "./src/*": "./src/*"
+  },
+  "scripts": {
+    "test": "vitest run --config ../../vitest.config.ts --passWithNoTests",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@starter/config": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

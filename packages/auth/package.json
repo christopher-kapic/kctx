@@ -1,24 +1,38 @@
 {
-  "name": "@kctx/auth",
+  "name": "@starter/auth",
+  "license": "UNLICENSED",
+  "private": true,
   "type": "module",
   "exports": {
     ".": {
       "default": "./src/index.ts"
     },
-    "./*": {
-      "default": "./src/*.ts"
+    "./ban": {
+      "default": "./src/ban.ts"
+    },
+    "./roles": {
+      "default": "./src/roles.ts"
+    },
+    "./two-factor-policy": {
+      "default": "./src/two-factor-policy.ts"
+    },
+    "./user-creation-policy": {
+      "default": "./src/user-creation-policy.ts"
     }
   },
-  "scripts": {},
+  "scripts": {
+    "test": "vitest run --config ../../vitest.config.ts --passWithNoTests"
+  },
   "dependencies": {
-    "@kctx/db": "workspace:*",
-    "@kctx/env": "workspace:*",
+    "@starter/config": "workspace:*",
+    "@starter/db": "workspace:*",
+    "@starter/env": "workspace:*",
+    "@starter/mailer": "workspace:*",
     "better-auth": "catalog:",
-    "dotenv": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@kctx/config": "workspace:*",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

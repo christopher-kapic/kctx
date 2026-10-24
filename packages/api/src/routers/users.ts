@@ -1,78 +1,316 @@
+import { randomBytes } from "node:crypto";
 import { ORPCError } from "@orpc/server";
+import { auth } from "@starter/auth";
+import { runWithAllowedUserCreation } from "@starter/auth/user-creation-policy";
+import prisma, { type Prisma } from "@starter/db";
+import { env } from "@starter/env/server";
+import { renderInviteUser, sendEmail } from "@starter/mailer";
 import { z } from "zod";
 
-import prisma from "@kctx/db";
+import { adminOr404Procedure } from "../index";
+import { cursorPage, cursorPageInput, pageTake, withCursor } from "../lib/pagination";
 
-import { adminProcedure } from "../index";
+// Roles surfaced in the admin UI. Better-auth itself stores `role` as a free-
+// form string (and supports comma-separated lists), but the admin dashboard
+// only ever assigns one of these two — anything else came from custom code or
+// a database edit and we leave it untouched.
+const ASSIGNABLE_ROLES = ["user", "admin"] as const;
+const assignableRoleSchema = z.enum(ASSIGNABLE_ROLES);
+
+const userIdInput = z.object({ userId: z.string().min(1) });
+
+const userStatusFilter = z.enum(["all", "active", "archived"]);
+
+function generateTempPassword(): string {
+  // 24 url-safe bytes → ~32 chars. Long enough to satisfy any reasonable
+  // strength check; short enough to read from an email.
+  return randomBytes(24).toString("base64url");
+}
+
+const USER_SELECT = {
+  id: true,
+  email: true,
+  name: true,
+  role: true,
+  emailVerified: true,
+  banned: true,
+  banReason: true,
+  banExpires: true,
+  twoFactorEnabled: true,
+  image: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
 
 export const usersRouter = {
-  list: adminProcedure.handler(async () => {
-    return prisma.user.findMany({
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        createdAt: true,
-        banned: true,
-      },
-    });
-  }),
+  list: adminOr404Procedure
+    .input(
+      cursorPageInput
+        .extend({
+          limit: z.number().int().min(1).max(100).default(50),
+          search: z.string().trim().max(200).optional(),
+          status: userStatusFilter.default("all"),
+        })
+        .optional(),
+    )
+    .handler(async ({ input }) => {
+      const limit = input?.limit ?? 50;
+      const cursor = input?.cursor;
+      const search = input?.search;
+      const status = input?.status ?? "all";
+      // Status is filtered in the database, not on the client: filtering
+      // already-paginated pages makes both the empty state and the "load more"
+      // affordance lie (an all-archived first page under the "active" tab would
+      // look empty even though later pages hold active users). `banned` is a
+      // nullable Boolean, so "active" must match both `false` and NULL.
+      const searchWhere: Prisma.UserWhereInput | undefined = search
+        ? {
+            OR: [
+              { email: { contains: search, mode: "insensitive" as const } },
+              { name: { contains: search, mode: "insensitive" as const } },
+            ],
+          }
+        : undefined;
+      const statusWhere: Prisma.UserWhereInput | undefined =
+        status === "active"
+          ? { OR: [{ banned: false }, { banned: null }] }
+          : status === "archived"
+            ? { banned: true }
+            : undefined;
+      // Narrowed (not just filtered): `withCursor` ANDs this into an array,
+      // where an `undefined` union member would fail typecheck.
+      const conditions = [statusWhere, searchWhere].filter(
+        (c): c is Prisma.UserWhereInput => c !== undefined,
+      );
+      const where: Prisma.UserWhereInput =
+        conditions.length > 1 ? { AND: conditions } : (conditions[0] ?? {});
+      // Cursor (keyset) pagination: no `skip` scan, no per-page `count()`.
+      // The admin UI consumes this as an infinite list (LoadMore), so the
+      // header total is dropped — it cost a full filtered count per page for
+      // a "showing N" nicety. Tie-break on the unique id: `createdAt` alone
+      // is not a stable sort key, so two users created in the same
+      // millisecond could repeat or vanish across pages.
+      const rows = await prisma.user.findMany({
+        // The status/search `where` stays the first `AND` member; the keyset
+        // narrows it, it never replaces it.
+        where: withCursor(where, "createdAt", cursor, "desc"),
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: pageTake(limit),
+        select: USER_SELECT,
+      });
+      const page = cursorPage(rows, limit, "createdAt");
+      return { users: page.items, nextCursor: page.nextCursor };
+    }),
 
-  updateRole: adminProcedure
+  invite: adminOr404Procedure
     .input(
       z.object({
-        userId: z.string(),
-        role: z.enum(["admin", "user"]),
+        email: z.string().email().toLowerCase(),
+        name: z.string().trim().min(1).max(100),
+        role: assignableRoleSchema.default("user"),
+      }),
+    )
+    .handler(async ({ input }) => {
+      const tempPassword = generateTempPassword();
+
+      // `auth.api.createUser` is the only admin-plugin endpoint that accepts
+      // server-side calls without a session in headers (verified in the
+      // better-auth source). It hashes the password, enforces email
+      // uniqueness, and writes through the Prisma adapter so it stays in
+      // sync with any custom databaseHooks (e.g. ADMIN_EMAILS auto-promote).
+      let userId: string;
+      let recipientLocale: string;
+      try {
+        const created = await runWithAllowedUserCreation("admin-invite", () =>
+          auth.api.createUser({
+            body: {
+              email: input.email,
+              password: tempPassword,
+              name: input.name,
+              role: input.role,
+            },
+          }),
+        );
+        userId = created.user.id;
+        // The User row was just created with the Prisma `@default("en-US")`
+        // for `locale`. Read it back so a future change to the default (or a
+        // hook that overrides it) flows through to the email render without
+        // additional plumbing here.
+        const fresh = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { locale: true },
+        });
+        recipientLocale = fresh?.locale ?? "en-US";
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to invite user";
+        if (/already exists|already in use|duplicate/i.test(message)) {
+          throw new ORPCError("CONFLICT", {
+            message: "A user with that email already exists.",
+          });
+        }
+        if (/sign-?up.*disabled|disabled.*sign-?up/i.test(message)) {
+          throw new ORPCError("BAD_REQUEST", {
+            message:
+              "Account creation is disabled by the auth configuration. Ask an admin to check the invite setup.",
+          });
+        }
+        // Log only name+message — the generated temp password was just
+        // passed to auth.api.createUser, so we don't dump the raw error
+        // object in case a future better-auth release attaches request
+        // context to thrown errors.
+        const errLabel = err instanceof Error ? `${err.name}: ${err.message}` : "unknown error";
+        console.error("[users.invite] auth.api.createUser failed:", errLabel);
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
+          message:
+            "Couldn't create that account. Try again, or contact an admin if it keeps happening.",
+        });
+      }
+
+      // Email send is best-effort: if SMTP is not configured (or fails) we
+      // still return the temp password to the admin so they can share it
+      // out of band. The email failure is logged but does not roll back the
+      // user creation — undoing it would race against any concurrent admin
+      // who is already looking at the new row.
+      let emailSent = false;
+      try {
+        const { subject, html } = renderInviteUser({
+          name: input.name,
+          email: input.email,
+          tempPassword,
+          signInUrl: `${env.BETTER_AUTH_URL}/login`,
+          locale: recipientLocale,
+        });
+        await sendEmail({ to: input.email, subject, html });
+        emailSent = true;
+      } catch (err) {
+        console.warn("[users.invite] failed to send invite email", err);
+      }
+
+      return { userId, tempPassword, emailSent };
+    }),
+
+  setRole: adminOr404Procedure
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        role: assignableRoleSchema,
+      }),
+    )
+    .handler(async ({ input, context }) => {
+      // Don't let an admin demote themselves — if they're the only admin
+      // they'd lock themselves (and everyone) out of /admin.
+      if (input.userId === context.session.user.id && input.role !== "admin") {
+        throw new ORPCError("FORBIDDEN", {
+          message: "You cannot remove your own admin role.",
+        });
+      }
+      const target = await prisma.user.findUnique({
+        where: { id: input.userId },
+        select: { id: true },
+      });
+      if (!target) throw new ORPCError("NOT_FOUND", { message: "User not found" });
+
+      await prisma.user.update({
+        where: { id: input.userId },
+        data: { role: input.role },
+      });
+      return { success: true };
+    }),
+
+  archive: adminOr404Procedure
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        reason: z.string().trim().max(500).optional(),
       }),
     )
     .handler(async ({ input, context }) => {
       if (input.userId === context.session.user.id) {
-        throw new ORPCError("BAD_REQUEST", {
-          message: "Cannot change your own role",
+        throw new ORPCError("FORBIDDEN", {
+          message: "You cannot archive your own account.",
         });
       }
-
-      const user = await prisma.user.findUnique({
+      const target = await prisma.user.findUnique({
         where: { id: input.userId },
+        select: { id: true },
       });
-      if (!user) {
-        throw new ORPCError("NOT_FOUND", { message: "User not found" });
-      }
+      if (!target) throw new ORPCError("NOT_FOUND", { message: "User not found" });
 
-      return prisma.user.update({
-        where: { id: input.userId },
-        data: { role: input.role },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          role: true,
-          createdAt: true,
-          banned: true,
-        },
-      });
-    }),
-
-  delete: adminProcedure
-    .input(z.object({ userId: z.string() }))
-    .handler(async ({ input, context }) => {
-      if (input.userId === context.session.user.id) {
-        throw new ORPCError("BAD_REQUEST", {
-          message: "Cannot delete your own account",
-        });
-      }
-
-      const user = await prisma.user.findUnique({
-        where: { id: input.userId },
-      });
-      if (!user) {
-        throw new ORPCError("NOT_FOUND", { message: "User not found" });
-      }
-
-      await prisma.user.delete({ where: { id: input.userId } });
-
+      // Set banned=true so better-auth treats the user as locked, and revoke
+      // every active session so the next page-load signs them out. We mirror
+      // what the admin plugin's banUser endpoint does internally — no expiry
+      // (banExpires=null), no auto-unban.
+      //
+      // If you add a standing credential that authenticates from its own row
+      // (an API key, a personal access token), revoke it here too: deleting
+      // sessions does not touch it, so it would outlive the ban everywhere a
+      // per-surface ban re-check does not reach.
+      await prisma.$transaction([
+        prisma.user.update({
+          where: { id: input.userId },
+          data: {
+            banned: true,
+            banReason: input.reason ?? null,
+            banExpires: null,
+          },
+        }),
+        prisma.session.deleteMany({ where: { userId: input.userId } }),
+      ]);
       return { success: true };
     }),
+
+  unarchive: adminOr404Procedure.input(userIdInput).handler(async ({ input }) => {
+    const target = await prisma.user.findUnique({
+      where: { id: input.userId },
+      select: { id: true },
+    });
+    if (!target) throw new ORPCError("NOT_FOUND", { message: "User not found" });
+
+    // Lifts the ban only. If you add a standing credential that `archive`
+    // revokes, do NOT flip it back on from here: the row records that a
+    // credential IS revoked, not who revoked it, so a blanket re-enable would
+    // also resurrect one an admin had deliberately killed earlier (a leaked
+    // key, a decommissioned integration). Restoring precisely needs a column
+    // recording that archive was the revoker.
+    await prisma.user.update({
+      where: { id: input.userId },
+      data: { banned: false, banReason: null, banExpires: null },
+    });
+    return { success: true };
+  }),
+
+  remove: adminOr404Procedure.input(userIdInput).handler(async ({ input, context }) => {
+    if (input.userId === context.session.user.id) {
+      throw new ORPCError("FORBIDDEN", {
+        message: "You cannot delete your own account.",
+      });
+    }
+    const target = await prisma.user.findUnique({
+      where: { id: input.userId },
+      select: { id: true },
+    });
+    if (!target) throw new ORPCError("NOT_FOUND", { message: "User not found" });
+
+    // Sessions, accounts, two-factors and push subs
+    // cascade. Posts (`onDelete: Restrict`) do not — if the user has authored
+    // posts the delete will fail with a Prisma constraint error and we
+    // surface a friendly message suggesting "archive" instead.
+    try {
+      await prisma.user.delete({ where: { id: input.userId } });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to delete user";
+      if (/foreign key|constraint|restrict/i.test(message)) {
+        throw new ORPCError("CONFLICT", {
+          message:
+            "This user has authored content and cannot be deleted. Archive them instead, or reassign their content first.",
+        });
+      }
+      console.error("[users.remove] prisma delete failed", err);
+      throw new ORPCError("INTERNAL_SERVER_ERROR", {
+        message:
+          "Couldn't delete that account. Try again, or contact an admin if it keeps happening.",
+      });
+    }
+    return { success: true };
+  }),
 };

@@ -1,0 +1,108 @@
+{
+  "tabs": {
+    "home": "Inicio",
+    "account": "Cuenta"
+  },
+  "home": {
+    "title": "Starter",
+    "subtitle": "App de Expo conectada a la API compartida.",
+    "status": {
+      "live": "EN LÍNEA",
+      "offline": "SIN CONEXIÓN",
+      "checking": "VERIFICANDO"
+    },
+    "apiConnection": {
+      "title": "Conexión con la API",
+      "label": "Backend de oRPC",
+      "checking": "Verificando EXPO_PUBLIC_SERVER_URL...",
+      "connected": "Conectado a la API.",
+      "error": "No se puede conectar con la API. Revisa apps/native/.env y asegúrate de que el servidor esté en ejecución."
+    },
+    "appConfig": {
+      "title": "Configuración de la App",
+      "loading": "Cargando las banderas de funciones del servidor...",
+      "error": "No se pudieron cargar las banderas de funciones del servidor.",
+      "signupAvailable": "El registro está disponible.",
+      "signupDisabled": "El registro está desactivado."
+    },
+    "protected": {
+      "title": "API Protegida",
+      "loading": "Cargando datos protegidos...",
+      "error": "No se pudieron cargar los datos protegidos de esta sesión.",
+      "signedOut": "Inicia sesión en la pestaña Cuenta para llamar a un procedimiento autenticado."
+    }
+  },
+  "account": {
+    "title": "Cuenta",
+    "subtitle": "Estado de sesión de Better-Auth compartido con la API.",
+    "signedInAs": "Sesión iniciada como",
+    "signOut": "Cerrar Sesión",
+    "sso": {
+      "title": "SSO requerido",
+      "description": "Este servidor requiere inicio de sesión con SSO. Usa la app web para iniciar sesión hasta que se agregue SSO nativo para este producto."
+    },
+    "signupDisabled": {
+      "title": "Registro desactivado",
+      "description": "El servidor controla la creación de cuentas. Configura SIGNUP_ENABLED=true o el registro de arranque de administrador para mostrar el formulario de creación de cuenta."
+    }
+  },
+  "auth": {
+    "fields": {
+      "name": "Nombre",
+      "email": "Correo Electrónico",
+      "password": "Contraseña"
+    },
+    "validation": {
+      "nameRequired": "El nombre es obligatorio",
+      "nameMin": "El nombre debe tener al menos 2 caracteres",
+      "emailRequired": "El correo es obligatorio",
+      "emailInvalid": "Ingresa un correo electrónico válido",
+      "passwordRequired": "La contraseña es obligatoria",
+      "passwordMin": "Usa al menos 12 caracteres"
+    },
+    "signIn": {
+      "heading": "Iniciar Sesión",
+      "submit": "Iniciar Sesión",
+      "success": "Sesión iniciada correctamente",
+      "failed": "No se pudo iniciar sesión"
+    },
+    "signUp": {
+      "heading": "Crear Cuenta",
+      "submit": "Crear Cuenta",
+      "success": "Cuenta creada. Revisa tu correo para verificar tu cuenta antes de iniciar sesión.",
+      "failed": "No se pudo crear la cuenta"
+    },
+    "forgotPassword": {
+      "trigger": "¿Olvidaste tu contraseña?",
+      "heading": "Restablece tu contraseña",
+      "prompt": "Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña. Ábrelo en la web para terminar.",
+      "submit": "Enviar enlace de restablecimiento",
+      "sending": "Enviando…",
+      "success": "Si existe una cuenta con ese correo, te enviamos un enlace para restablecer tu contraseña.",
+      "failed": "No se pudo enviar el enlace de restablecimiento. Intenta de nuevo.",
+      "back": "Volver"
+    },
+    "twoFactor": {
+      "title": "Autenticación de Dos Factores",
+      "emailPrompt": "Ingresa el código que enviamos a tu correo.",
+      "appPrompt": "Ingresa un código de tu aplicación de autenticación.",
+      "codeLabel": "Código de Verificación",
+      "verify": "Verificar",
+      "emailMe": "Envíame un código por correo",
+      "resend": "Reenviar código por correo",
+      "back": "Volver",
+      "invalidCode": "Código de verificación inválido",
+      "codeSent": "Código de verificación enviado",
+      "sendFailed": "No se pudo enviar un código por correo en este momento"
+    },
+    "errors": {
+      "unexpected": "Algo salió mal. Inténtalo de nuevo."
+    }
+  },
+  "notFound": {
+    "title": "No Encontrado",
+    "heading": "Página No Encontrada",
+    "description": "La página que buscas no existe.",
+    "goHome": "Ir al Inicio"
+  }
+}

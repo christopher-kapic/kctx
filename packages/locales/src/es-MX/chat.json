@@ -1,0 +1,66 @@
+{
+  "actions": {
+    "delete": "Eliminar",
+    "reconnect": "Reconectar",
+    "refresh": "Actualizar",
+    "rename": "Cambiar nombre",
+    "retry": "Intentar de nuevo"
+  },
+  "composer": {
+    "hint": "Enter para enviar · Shift+Enter para una nueva línea",
+    "label": "Mensaje",
+    "placeholder": "Pregunta lo que quieras…",
+    "send": "Enviar mensaje",
+    "thinking": "Esperando a que termine la respuesta actual…"
+  },
+  "disclosure": "Estás conversando con un asistente de inteligencia artificial. Puede cometer errores. Tus mensajes se envían a un proveedor de inteligencia artificial para generar respuestas.",
+  "errors": {
+    "delete": "No se pudo eliminar esta conversación.",
+    "messages": "No se pudo cargar esta conversación.",
+    "moreSessions": "No se pudieron cargar más conversaciones.",
+    "olderMessages": "No se pudieron cargar los mensajes anteriores.",
+    "rename": "No se pudo cambiar el nombre de esta conversación.",
+    "response": "La respuesta se detuvo antes de terminar.",
+    "retry": "No se pudo reintentar la respuesta.",
+    "send": "No se pudo enviar tu mensaje. Se conservó tu borrador.",
+    "sessions": "No se pudieron cargar las conversaciones."
+  },
+  "messages": {
+    "empty": "Envía un mensaje para iniciar la conversación.",
+    "jumpToLatest": "Ir a lo más reciente",
+    "loadOlder": "Cargar mensajes anteriores",
+    "transcript": "Transcripción de la conversación"
+  },
+  "sessions": {
+    "deleteCopy": "Copiar el nombre de la conversación",
+    "deleteDescription": "Esto elimina la conversación y todos sus mensajes. No se puede deshacer.",
+    "deleteTitle": "Eliminar conversación",
+    "deleteTypePrompt": "Escribe el nombre de la conversación para confirmar",
+    "description": "Elige una conversación o inicia una nueva.",
+    "empty": "Aún no hay conversaciones.",
+    "loadMore": "Cargar conversaciones anteriores",
+    "menu": "Opciones de {{name}}",
+    "new": "Nuevo chat",
+    "open": "Abrir conversaciones",
+    "renameDescription": "Ponle a esta conversación un nombre que reconozcas después.",
+    "renameLabel": "Título",
+    "renameTitle": "Cambiar nombre de la conversación",
+    "title": "Conversaciones",
+    "untitled": "Chat sin título"
+  },
+  "status": {
+    "disconnected": "Las actualizaciones en vivo están desconectadas. Al reconectar se retoma donde se quedó.",
+    "error": "Respuesta interrumpida",
+    "idle": "Listo",
+    "running": "Pensando…",
+    "stale": "Esta respuesta lleva un rato sin actividad. Busca actualizaciones guardadas."
+  },
+  "title": "Chat",
+  "tools": {
+    "activity": "Actividad de herramientas"
+  },
+  "unavailable": {
+    "description": "Este servidor se desplegó sin un modelo de chat configurado. Un administrador puede habilitarlo definiendo OPENROUTER_API_KEY y CHAT_ENABLED.",
+    "title": "El chat no está disponible"
+  }
+}

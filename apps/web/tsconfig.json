@@ -1,18 +1,14 @@
 {
+  "extends": "@starter/config/tsconfig.base.json",
   "compilerOptions": {
-    "strict": true,
-    "esModuleInterop": true,
     "jsx": "react-jsx",
-    "target": "ESNext",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "verbatimModuleSyntax": true,
-    "skipLibCheck": true,
-    "types": ["vite/client"],
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["vite/client", "node"],
     "rootDirs": ["."],
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@locales/*": ["../../packages/locales/src/*"],
+      "@starter/ui/*": ["../../packages/ui/src/*"]
     }
   }
 }

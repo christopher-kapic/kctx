@@ -1,20 +1,32 @@
 {
-  "name": "@kctx/env",
+  "name": "@starter/env",
+  "license": "UNLICENSED",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "exports": {
+    "./backup-config": "./src/backup-config.ts",
+    "./shared": "./src/shared.ts",
+    "./vars/server": "./src/vars/server.ts",
     "./server": "./src/server.ts",
-    "./web": "./src/web.ts"
+    "./web": "./src/web.ts",
+    "./native": "./src/native.ts",
+    "./load-dotenv": "./src/load-dotenv.ts",
+    "./root-env": "./src/root-env.ts"
   },
   "dependencies": {
-    "@t3-oss/env-core": "^0.13.1",
+    "@t3-oss/env-core": "^0.13.11",
     "dotenv": "catalog:",
     "zod": "catalog:"
   },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "test": "vitest run --config ../../vitest.config.ts --passWithNoTests"
+  },
   "devDependencies": {
-    "@kctx/config": "workspace:*",
+    "@starter/config": "workspace:*",
     "@types/node": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

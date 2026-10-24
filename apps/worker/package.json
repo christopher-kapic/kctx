@@ -1,0 +1,39 @@
+{
+  "name": "worker",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    "./runtime": "./src/runtime.ts"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "test": "vitest run --config ../../vitest.config.ts --passWithNoTests",
+    "check-types": "tsc --noEmit",
+    "build": "tsdown",
+    "start": "node dist/index.mjs"
+  },
+  "dependencies": {
+    "@starter/agent-runtime": "workspace:*",
+    "@starter/api": "workspace:*",
+    "@starter/auth": "workspace:*",
+    "@starter/db": "workspace:*",
+    "@starter/env": "workspace:*",
+    "@starter/mailer": "workspace:*",
+    "@starter/queue": "workspace:*",
+    "bullmq": "catalog:",
+    "ioredis": "catalog:",
+    "sharp": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@starter/config": "workspace:*",
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "vitest-mock-extended": "catalog:"
+  }
+}

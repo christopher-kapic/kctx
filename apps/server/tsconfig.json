@@ -1,9 +1,6 @@
 {
-  "extends": "@kctx/config/tsconfig.base.json",
+  "extends": "@starter/config/tsconfig.base.json",
   "compilerOptions": {
-    "composite": true,
-    "outDir": "dist",
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     },

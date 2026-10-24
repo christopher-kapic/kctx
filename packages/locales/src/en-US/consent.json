@@ -1,0 +1,13 @@
+{
+  "banner": {
+    "title": "Cookies on this site",
+    "message": "Essential cookies keep this site working — sign-in, security, and your saved preferences. With your permission we would also measure how the site is used so we can improve it. You can change your mind at any time.",
+    "accept": "Allow analytics",
+    "reject": "Reject analytics"
+  },
+  "preferences": {
+    "open": "Cookie preferences",
+    "title": "Cookies and analytics",
+    "description": "Choose again whether this site may measure how you use it. Essential cookies are always on — the site cannot work without them."
+  }
+}

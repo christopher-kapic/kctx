@@ -1,0 +1,108 @@
+{
+  "tabs": {
+    "home": "Home",
+    "account": "Account"
+  },
+  "home": {
+    "title": "Starter",
+    "subtitle": "Expo app connected to the shared API.",
+    "status": {
+      "live": "LIVE",
+      "offline": "OFFLINE",
+      "checking": "CHECKING"
+    },
+    "apiConnection": {
+      "title": "API Connection",
+      "label": "oRPC backend",
+      "checking": "Checking EXPO_PUBLIC_SERVER_URL...",
+      "connected": "Connected to the API.",
+      "error": "Cannot reach the API. Check apps/native/.env and make sure the server is running."
+    },
+    "appConfig": {
+      "title": "App Config",
+      "loading": "Loading server feature flags...",
+      "error": "Could not load feature flags from the server.",
+      "signupAvailable": "Signup is available.",
+      "signupDisabled": "Signup is disabled."
+    },
+    "protected": {
+      "title": "Protected API",
+      "loading": "Loading protected data...",
+      "error": "Could not load protected data for this session.",
+      "signedOut": "Sign in on the Account tab to call an authenticated procedure."
+    }
+  },
+  "account": {
+    "title": "Account",
+    "subtitle": "Better-Auth session state shared with the API.",
+    "signedInAs": "Signed in as",
+    "signOut": "Sign Out",
+    "sso": {
+      "title": "SSO required",
+      "description": "This server requires SSO sign-in. Use the web app to sign in until native SSO is added for this product."
+    },
+    "signupDisabled": {
+      "title": "Signup disabled",
+      "description": "The server controls account creation. Set SIGNUP_ENABLED=true or configure admin bootstrap signup to show the create-account form."
+    }
+  },
+  "auth": {
+    "fields": {
+      "name": "Name",
+      "email": "Email",
+      "password": "Password"
+    },
+    "validation": {
+      "nameRequired": "Name is required",
+      "nameMin": "Name must be at least 2 characters",
+      "emailRequired": "Email is required",
+      "emailInvalid": "Enter a valid email address",
+      "passwordRequired": "Password is required",
+      "passwordMin": "Use at least 12 characters"
+    },
+    "signIn": {
+      "heading": "Sign In",
+      "submit": "Sign In",
+      "success": "Signed in successfully",
+      "failed": "Failed to sign in"
+    },
+    "signUp": {
+      "heading": "Create Account",
+      "submit": "Create Account",
+      "success": "Account created. Check your email to verify your account before signing in.",
+      "failed": "Failed to sign up"
+    },
+    "forgotPassword": {
+      "trigger": "Forgot password?",
+      "heading": "Reset your password",
+      "prompt": "Enter your email and we'll send you a link to reset your password. Open the link on the web to finish.",
+      "submit": "Send reset link",
+      "sending": "Sending…",
+      "success": "If an account exists for that email, we sent a link to reset your password.",
+      "failed": "Couldn't send a reset link. Try again.",
+      "back": "Back"
+    },
+    "twoFactor": {
+      "title": "Two-factor authentication",
+      "emailPrompt": "Enter the code sent to your email.",
+      "appPrompt": "Enter a code from your authenticator app.",
+      "codeLabel": "Verification code",
+      "verify": "Verify",
+      "emailMe": "Email me a code",
+      "resend": "Resend email code",
+      "back": "Back",
+      "invalidCode": "Invalid verification code",
+      "codeSent": "Verification code sent",
+      "sendFailed": "Could not send an email code right now"
+    },
+    "errors": {
+      "unexpected": "Something went wrong. Try again."
+    }
+  },
+  "notFound": {
+    "title": "Not Found",
+    "heading": "Page Not Found",
+    "description": "The page you're looking for doesn't exist.",
+    "goHome": "Go Home"
+  }
+}

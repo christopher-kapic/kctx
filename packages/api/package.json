@@ -1,37 +1,106 @@
 {
-  "name": "@kctx/api",
+  "name": "@starter/api",
+  "license": "UNLICENSED",
+  "private": true,
   "type": "module",
   "exports": {
     ".": {
       "default": "./src/index.ts"
     },
-    "./*": {
-      "default": "./src/*.ts"
+    "./context": {
+      "default": "./src/context.ts"
     },
-    "./rag": {
-      "default": "./src/rag/index.ts"
+    "./routers/index": {
+      "default": "./src/routers/index.ts"
+    },
+    "./lib/push-subscription": {
+      "default": "./src/lib/push-subscription.ts"
+    },
+    "./lib/slug": {
+      "default": "./src/lib/slug.ts"
+    },
+    "./lib/assets": {
+      "default": "./src/lib/assets.ts"
+    },
+    "./lib/sniff-mime": {
+      "default": "./src/lib/sniff-mime.ts"
+    },
+    "./lib/images": {
+      "default": "./src/lib/images.ts"
+    },
+    "./lib/image-transform-cache": {
+      "default": "./src/lib/image-transform-cache.ts"
+    },
+    "./lib/storage": {
+      "default": "./src/lib/storage.ts"
+    },
+    "./lib/asset-client": {
+      "default": "./src/lib/asset-client.ts"
+    },
+    "./lib/asset-cleanup": {
+      "default": "./src/lib/asset-cleanup.ts"
+    },
+    "./lib/backup-freshness": {
+      "default": "./src/lib/backup-freshness.ts"
+    },
+    "./lib/ownership": {
+      "default": "./src/lib/ownership.ts"
+    },
+    "./lib/auth-token-retention": {
+      "default": "./src/lib/auth-token-retention.ts"
+    },
+    "./lib/two-factor-policy": {
+      "default": "./src/lib/two-factor-policy.ts"
+    },
+    "./lib/asset-image-hint": {
+      "default": "./src/lib/asset-image-hint.ts"
+    },
+    "./lib/asset-image-prepare": {
+      "default": "./src/lib/asset-image-prepare.ts"
+    },
+    "./lib/asset-image-policy": {
+      "default": "./src/lib/asset-image-policy.ts"
+    },
+    "./lib/image-limits": {
+      "default": "./src/lib/image-limits.ts"
+    },
+    "./lib/chat": {
+      "default": "./src/lib/chat.ts"
+    },
+    "./lib/rate-limit-families": {
+      "default": "./src/lib/rate-limit-families.ts"
     }
   },
-  "scripts": {},
+  "scripts": {
+    "check-types": "tsc -p tsconfig.check-types.json --noEmit && pnpm check-types:contracts",
+    "check-types:contracts": "tsc -p tsconfig.boundary-tests.json --noEmit",
+    "test": "vitest run --config ../../vitest.config.ts --passWithNoTests --exclude '**/*.contract.test.ts'"
+  },
   "dependencies": {
-    "@kctx/auth": "workspace:*",
-    "@kctx/db": "workspace:*",
-    "@kctx/env": "workspace:*",
-    "@opencode-ai/sdk": "^1.2.15",
     "@orpc/client": "catalog:",
     "@orpc/openapi": "catalog:",
     "@orpc/server": "catalog:",
     "@orpc/zod": "catalog:",
-    "dotenv": "catalog:",
-    "better-sqlite3": "^11.7.0",
-    "simple-git": "^3.32.3",
-    "sqlite-vec": "^0.1.6",
+    "@aws-sdk/client-s3": "catalog:",
+    "@aws-sdk/s3-request-presigner": "catalog:",
+    "@starter/auth": "workspace:*",
+    "@starter/config": "workspace:*",
+    "@starter/db": "workspace:*",
+    "@starter/env": "workspace:*",
+    "@starter/mailer": "workspace:*",
+    "@starter/queue": "workspace:*",
+    "blurhash": "catalog:",
+    "heic-to": "catalog:",
+    "rate-limiter-flexible": "catalog:",
+    "sharp": "catalog:",
+    "web-push": "^3.6.7",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@kctx/config": "workspace:*",
-    "@types/better-sqlite3": "^7.6.12",
+    "@types/web-push": "^3.6.4",
     "hono": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "vitest-mock-extended": "catalog:"
   }
 }

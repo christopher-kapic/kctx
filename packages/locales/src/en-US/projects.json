@@ -1,0 +1,41 @@
+{
+  "title": "Projects",
+  "description": "A private list. Only you can see what is here.",
+  "listTitle": "Your projects",
+  "countLabel": "{{count}} loaded",
+  "loadFailed": "Failed to load projects.",
+  "createdOn": "Created {{date}}",
+  "empty": {
+    "title": "No projects yet",
+    "description": "Create the first one to see how this page works."
+  },
+  "fields": {
+    "name": "Name",
+    "namePlaceholder": "Repaint the shed",
+    "notes": "Notes",
+    "notesDescription": "Optional. A note to yourself — nobody else can read it."
+  },
+  "actions": {
+    "new": "New project",
+    "create": "Create project",
+    "creating": "Creating…",
+    "rowMenuAriaLabel": "Actions for {{name}}"
+  },
+  "create": {
+    "title": "Create project",
+    "description": "Add a project to your list.",
+    "success": "Project created"
+  },
+  "edit": {
+    "title": "Edit project",
+    "description": "Change the name or the notes.",
+    "success": "Project updated"
+  },
+  "delete": {
+    "title": "Delete project",
+    "description": "This permanently deletes the project and its notes. It cannot be undone.",
+    "typeNameToConfirm": "Type the project name to confirm:",
+    "copyNameAriaLabel": "Copy project name",
+    "success": "Project deleted"
+  }
+}

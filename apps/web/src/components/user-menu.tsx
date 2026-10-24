@@ -1,63 +1,88 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Button } from "@starter/ui/components/button";
+import { Skeleton } from "@starter/ui/components/skeleton";
+import { useQuery } from "@tanstack/react-query";
+import { Link, useParams } from "@tanstack/react-router";
+import { lazy, Suspense, useState } from "react";
+import { useTranslation } from "react-i18next";
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { authClient } from "@/lib/auth-client";
+import { useAuthSession } from "@/hooks/use-auth-session";
+import { DEFAULT_LOCALE, isSupportedLocale } from "@/i18n/config";
+import { orpc } from "@/utils/orpc";
 
-import { Button } from "./ui/button";
-import { Skeleton } from "./ui/skeleton";
+// Lazy so the shared Base UI overlay chunk (Menu/Dialog/focus-guards) leaves the
+// eager first-paint bundle. Only the signed-in branch touches Base UI; the
+// pending Skeleton and signed-out Buttons/Links stay fully eager. The shell
+// below reproduces the trigger Button exactly, so the swap is zero-CLS.
+const UserMenuContent = lazy(() => import("./user-menu-content"));
+
+// Warm the chunk on hover/focus. The module cache dedupes repeat calls, so the
+// click handler that follows resolves instantly from cache.
+function prefetchMenu() {
+  void import("./user-menu-content");
+}
 
 export default function UserMenu() {
-  const navigate = useNavigate();
-  const { data: session, isPending } = authClient.useSession();
+  // `strict: false` so the menu renders under both prefixed and (briefly) the
+  // top-level `/` redirect route without throwing.
+  const params = useParams({ strict: false });
+  const lang = isSupportedLocale(params.lang) ? params.lang : DEFAULT_LOCALE;
+  const authSession = useAuthSession();
+  const { data: configData, isPending: configPending } = useQuery(orpc.appConfig.queryOptions());
+  const { t } = useTranslation("nav");
+  const [mounted, setMounted] = useState(false);
 
-  if (isPending) {
-    return <Skeleton className="h-9 w-24" />;
+  if (authSession.state.status === "pending" || authSession.state.status === "error") {
+    return <Skeleton className="h-11 w-24" />;
   }
 
-  if (!session) {
+  if (authSession.state.status === "anonymous") {
+    // Default to NOT showing Sign Up until the flag is known, so it never
+    // flashes when signup is disabled.
+    const showSignUp = !configPending && configData?.signupEnabled === true;
     return (
-      <Link to="/login">
-        <Button variant="outline">Sign In</Button>
-      </Link>
+      <div className="flex items-center gap-2">
+        {showSignUp && (
+          <Link to="/$lang/signup" params={{ lang }} search={{ redirectTo: undefined }}>
+            <Button size="touch">{t("userMenu.signUp")}</Button>
+          </Link>
+        )}
+        <Link to="/$lang/login" params={{ lang }} search={{ redirectTo: undefined }}>
+          <Button size="touch" variant="outline">
+            {t("userMenu.signIn")}
+          </Button>
+        </Link>
+      </div>
     );
   }
 
+  const session = authSession.state.session;
+
+  // The eager placeholder: visually identical to UserMenuContent's trigger so
+  // there is no layout shift when the real control loads. `inert` while the
+  // lazy chunk is in flight (Suspense fallback) so it can't take a second,
+  // ignored click.
+  const shell = (inert: boolean) => (
+    <Button
+      variant="outline"
+      size="touch"
+      aria-haspopup="menu"
+      inert={inert}
+      onPointerEnter={prefetchMenu}
+      onFocus={prefetchMenu}
+      onClick={() => {
+        prefetchMenu();
+        setMounted(true);
+      }}
+    >
+      {session.user.name}
+    </Button>
+  );
+
+  if (!mounted) return shell(false);
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger render={<Button variant="outline" />}>
-        {session.user.name}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="bg-card">
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>My Account</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem>{session.user.email}</DropdownMenuItem>
-          <DropdownMenuItem
-            variant="destructive"
-            onClick={() => {
-              authClient.signOut({
-                fetchOptions: {
-                  onSuccess: () => {
-                    navigate({
-                      to: "/",
-                    });
-                  },
-                },
-              });
-            }}
-          >
-            Sign Out
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Suspense fallback={shell(true)}>
+      <UserMenuContent />
+    </Suspense>
   );
 }

@@ -1,0 +1,66 @@
+{
+  "title": "Chat",
+  "disclosure": "You're chatting with an AI assistant. It can make mistakes. Your messages are sent to an AI provider to generate replies.",
+  "actions": {
+    "delete": "Delete",
+    "reconnect": "Reconnect",
+    "refresh": "Refresh",
+    "rename": "Rename",
+    "retry": "Try again"
+  },
+  "composer": {
+    "hint": "Enter to send · Shift+Enter for a new line",
+    "label": "Message",
+    "placeholder": "Ask anything…",
+    "send": "Send message",
+    "thinking": "Waiting for the current response to finish…"
+  },
+  "errors": {
+    "delete": "This conversation could not be deleted.",
+    "messages": "This conversation could not be loaded.",
+    "moreSessions": "More conversations could not be loaded.",
+    "olderMessages": "Older messages could not be loaded.",
+    "rename": "This conversation could not be renamed.",
+    "response": "The response stopped before it finished.",
+    "retry": "The response could not be retried.",
+    "send": "Your message could not be sent. Your draft was kept.",
+    "sessions": "Conversations could not be loaded."
+  },
+  "messages": {
+    "empty": "Send a message to start the conversation.",
+    "jumpToLatest": "Jump to latest",
+    "loadOlder": "Load older messages",
+    "transcript": "Conversation transcript"
+  },
+  "sessions": {
+    "deleteCopy": "Copy conversation name",
+    "deleteDescription": "This deletes the conversation and every message in it. This cannot be undone.",
+    "deleteTitle": "Delete conversation",
+    "deleteTypePrompt": "Type the conversation name to confirm",
+    "description": "Choose a conversation or start a new one.",
+    "empty": "No conversations yet.",
+    "loadMore": "Load older conversations",
+    "menu": "Options for {{name}}",
+    "new": "New chat",
+    "open": "Open conversations",
+    "renameDescription": "Give this conversation a name you'll recognize later.",
+    "renameLabel": "Title",
+    "renameTitle": "Rename conversation",
+    "title": "Conversations",
+    "untitled": "Untitled chat"
+  },
+  "status": {
+    "disconnected": "Live updates are disconnected. Reconnecting picks up where this left off.",
+    "error": "Response interrupted",
+    "idle": "Ready",
+    "running": "Thinking…",
+    "stale": "This response has been quiet for a while. Check for saved updates."
+  },
+  "tools": {
+    "activity": "Tool activity"
+  },
+  "unavailable": {
+    "description": "This server was deployed without a chat model configured. An administrator can enable it by setting OPENROUTER_API_KEY and CHAT_ENABLED.",
+    "title": "Chat isn't available"
+  }
+}

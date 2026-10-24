@@ -1,10 +1,17 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../generated"
-  moduleFormat = "esm"
-  runtime = "nodejs"
+  provider        = "prisma-client"
+  output          = "../generated"
+  moduleFormat    = "esm"
+  runtime         = "nodejs"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "sqlite"
+  provider   = "postgresql"
+  // `pg_trgm` backs the GIN trigram indexes on the ILIKE-filtered columns
+  // (Asset.storageKey/mimeType, User.email/name, Post.body). It ships in the
+  // stock postgres:17 image used by docker-compose.dev.yml, packages/db/
+  // docker-compose.yml, and Dokploy, and `prisma db push` enables it — no
+  // migration file needed (this repo pushes schema, it does not migrate).
+  extensions = [pg_trgm]
 }

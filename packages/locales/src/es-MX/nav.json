@@ -1,0 +1,26 @@
+{
+  "items": {
+    "home": "Inicio",
+    "dashboard": "Panel de control",
+    "projects": "Proyectos",
+    "chat": "Chat",
+    "settings": "Configuración",
+    "admin": "Administración"
+  },
+  "languageLabel": "Idioma",
+  "mainNav": {
+    "ariaLabel": "Navegación principal"
+  },
+  "themeToggle": {
+    "label": "Cambiar tema",
+    "light": "Claro",
+    "dark": "Oscuro",
+    "system": "Sistema"
+  },
+  "userMenu": {
+    "myAccount": "Mi cuenta",
+    "signIn": "Iniciar sesión",
+    "signOut": "Cerrar sesión",
+    "signUp": "Registrarse"
+  }
+}

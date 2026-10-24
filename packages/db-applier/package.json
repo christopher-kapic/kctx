@@ -1,0 +1,12 @@
+{
+  "name": "@starter/db-applier",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Runtime dependency closure for the privileged db-applier image (backup / restore / prisma db push). Not imported by any app — it exists so Dockerfile.db-applier can `pnpm deploy` a lockfile-pinned node_modules instead of a bare, unlocked `npm install`.",
+  "dependencies": {
+    "@aws-sdk/client-s3": "catalog:",
+    "dotenv": "catalog:",
+    "pg": "catalog:",
+    "prisma": "catalog:"
+  }
+}

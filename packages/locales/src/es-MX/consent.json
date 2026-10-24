@@ -1,0 +1,13 @@
+{
+  "banner": {
+    "title": "Cookies en este sitio",
+    "message": "Las cookies esenciales mantienen este sitio funcionando: inicio de sesión, seguridad y tus preferencias guardadas. Con tu permiso también mediríamos cómo se usa el sitio para poder mejorarlo. Puedes cambiar de opinión cuando quieras.",
+    "accept": "Permitir análisis",
+    "reject": "Rechazar análisis"
+  },
+  "preferences": {
+    "open": "Preferencias de cookies",
+    "title": "Cookies y análisis",
+    "description": "Elige de nuevo si este sitio puede medir cómo lo usas. Las cookies esenciales siempre están activas: el sitio no puede funcionar sin ellas."
+  }
+}

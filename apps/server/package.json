@@ -1,43 +1,41 @@
 {
   "name": "server",
+  "license": "UNLICENSED",
+  "private": true,
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
     "build": "tsdown",
-    "check-types": "tsc -b",
+    "check-types": "tsc --noEmit",
     "compile": "bun build --compile --minify --sourcemap --bytecode ./src/index.ts --outfile server",
     "dev": "tsx watch src/index.ts",
-    "start": "node dist/index.mjs"
+    "start": "node dist/index.mjs",
+    "test": "vitest run --config ../../vitest.config.ts --passWithNoTests"
   },
   "dependencies": {
-    "@hono/mcp": "^0.2.4",
-    "@hono/node-server": "^1.14.4",
-    "@hono/node-ws": "^1.3.0",
-    "@kctx/api": "workspace:*",
-    "@kctx/auth": "workspace:*",
-    "@kctx/db": "workspace:*",
-    "@kctx/env": "workspace:*",
-    "@libsql/client": "^0.17.0",
-    "@modelcontextprotocol/sdk": "^1.27.1",
-    "@opencode-ai/sdk": "^1.2.15",
+    "@hono/node-server": "^2.1.3",
     "@orpc/openapi": "catalog:",
     "@orpc/server": "catalog:",
     "@orpc/zod": "catalog:",
+    "@starter/api": "workspace:*",
+    "@starter/auth": "workspace:*",
+    "@starter/db": "workspace:*",
+    "@starter/env": "workspace:*",
+    "@starter/queue": "workspace:*",
     "better-auth": "catalog:",
-    "dotenv": "catalog:",
     "hono": "catalog:",
-    "node-pty": "^1.1.0",
-    "sharp": "^0.33.0",
-    "better-sqlite3": "^11.7.0",
-    "simple-git": "^3.32.3",
-    "sqlite-vec": "^0.1.6",
-    "zod": "catalog:"
+    "rate-limiter-flexible": "catalog:",
+    "sharp": "catalog:",
+    "zod": "catalog:",
+    "worker": "workspace:*"
   },
   "devDependencies": {
-    "@kctx/config": "workspace:*",
+    "@starter/config": "workspace:*",
     "@types/node": "catalog:",
-    "tsdown": "^0.16.5",
-    "tsx": "^4.19.2",
-    "typescript": "catalog:"
+    "tsdown": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "vitest-mock-extended": "catalog:"
   }
 }

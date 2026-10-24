@@ -1,0 +1,106 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# This is the crate manifest for the companion Rust CLI (`apps/cli`).
+#
+# During getting-started/rebrand, run `cargo xtask init` from this directory to
+# rename `mycli` and fill in the placeholder metadata (OWNER, author,
+# description). The template compiles and all checks pass before you change
+# anything, so you always start from green. Keep the package name and [[bin]]
+# name aligned so release artifacts and `assert_cmd` tests use the same
+# executable.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[package]
+name = "mycli"
+version = "0.1.0"
+edition = "2024"
+publish = false
+# Minimum Supported Rust Version. Edition 2024 requires >= 1.85. The `msrv` CI
+# job is the source of truth — if you add a dependency that needs newer, bump
+# this and the job will tell you.
+rust-version = "1.85"
+description = "A fast, friendly command-line tool."
+authors = ["Your Name <you@example.com>"]
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/OWNER/mycli"
+homepage = "https://github.com/OWNER/mycli"
+documentation = "https://github.com/OWNER/mycli#readme"
+keywords = ["cli", "command-line"]
+categories = ["command-line-utilities"]
+# Files NOT shipped in the crates.io tarball (keeps `cargo publish` lean and
+# avoids leaking agent/dev scaffolding to package consumers).
+exclude = [
+    "tap/",
+    "AGENTS.md",
+    "CLAUDE.md",
+    ".cursorrules",
+]
+
+[package.metadata.dist]
+dist = true
+
+[[bin]]
+name = "mycli"
+path = "src/main.rs"
+
+[dependencies]
+# Error handling. anyhow for application code (rich context, easy `?`). Reach
+# for `thiserror` only when you publish a library with a stable error API; see
+# docs/error-handling.md.
+anyhow = "1.0.104"
+# Argument parsing + shell completions.
+clap = { version = "4.6.7", features = ["derive", "wrap_help"] }
+clap_complete = "4.6.11"
+# Cross-platform config/data directories (XDG on Linux, the right spots
+# on macOS and Windows).
+dirs = "7.0.0"
+# Serialization. serde_json powers `--json` output; toml powers the human-edited
+# config file.
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+# Temporary files for atomic config writes.
+tempfile = "3.27.0"
+toml = "1.1.6"
+# Structured logging. `--log-format`, `RUST_LOG`/`MYCLI_LOG` filtering.
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt", "json"] }
+
+[dev-dependencies]
+# Black-box CLI testing: run the built binary and assert on stdout/stderr/exit.
+assert_cmd = "2.2.2"
+predicates = "3.1.4"
+
+# ── Lints ────────────────────────────────────────────────────────────────────
+# Centralized lint policy. CI runs clippy with `-D warnings`, so anything `warn`
+# here fails the build in CI but stays a warning locally. Edit deliberately.
+[lints.rust]
+# No `unsafe` in a CLI like this — if you genuinely need it, change this to
+# "deny" and gate each block with a `// SAFETY:` comment.
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+# Guardrails that catch the bad decisions agents most often make:
+unwrap_used = "warn"        # prefer `?`/`expect("why")` over silent panics
+expect_used = "allow"       # `expect` with a reason is fine; flip to warn if strict
+todo = "warn"               # don't ship `todo!()`
+dbg_macro = "warn"          # don't ship `dbg!()`
+print_stdout = "warn"       # use `src/output.rs` so stdout stays deliberate
+print_stderr = "warn"       # use tracing or structured error handling
+
+# ── Release profile ──────────────────────────────────────────────────────────
+# Optimized for small, fast distributed binaries. Used by `dist` for releases.
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"
+
+# The profile `dist` uses for cutting releases (inherits release, kept separate
+# so you can tune release builds without affecting local `cargo build --release`).
+[profile.dist]
+inherits = "release"
+
+[workspace]
+members = ["xtask"]

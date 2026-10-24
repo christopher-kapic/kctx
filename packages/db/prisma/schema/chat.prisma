@@ -1,0 +1,135 @@
+// Durable agentic chat — see patterns/add-ins/chat.md.
+//
+// Postgres is the AUTHORITATIVE record of a conversation. Redis pub/sub is a
+// best-effort live transport only: every event a browser can receive is first
+// written here, and the SSE endpoint replays from `seq` on reconnect. Nothing
+// in this file may be relaxed without breaking that guarantee.
+
+enum ChatSessionStatus {
+  IDLE
+  RUNNING
+  ERROR
+}
+
+enum ChatRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+/// Whether a message row is still being rewritten in place.
+///
+/// LOAD-BEARING for the SSE contract: an `id:` promises FINALITY, not merely
+/// durability. The worker upserts the SAME `(sessionId, seq)` row over and over
+/// as an answer grows, so "this row is committed" and "this row is what the
+/// reader will end up with" are different facts — and only the second one may
+/// advance a client's `Last-Event-ID`. See patterns/durable-streaming.md.
+///
+/// An enum rather than a Boolean because this is state the app owns and the set
+/// plausibly grows (a future ABANDONED / MODERATED …) — the Prisma rules in
+/// AGENTS.md call for exactly that.
+enum ChatMessageState {
+  /// The producer is still writing this row. Never a resume point.
+  STREAMING
+  /// Final: the row will not be mutated again. The only state that may carry an
+  /// SSE `id:`.
+  COMPLETE
+}
+
+model ChatSession {
+  id        String   @id @default(cuid(2))
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+  ownerId   String
+  Owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  /// The conversation's name. The EMPTY STRING is the locale-neutral "unset"
+  /// sentinel — a freshly created session has no title yet, and the UI renders
+  /// a localized fallback (`chat:sessions.untitled`) for it. Never store an
+  /// English placeholder here: the column is shown verbatim in the page header
+  /// and the session rail for every locale, and it stays visible indefinitely
+  /// if the first run fails before the worker's auto-titling ever happens.
+  /// `chat.renameSession` requires a non-empty title, so "" can only ever mean
+  /// unset. The worker auto-titles from the first user message exactly while
+  /// this is "".
+  title     String
+
+  status        ChatSessionStatus @default(IDLE)
+  /// BullMQ job id of the run currently streaming into this session, or null
+  /// when no job owns the turn. Together with `status` it carries the
+  /// one-active-job invariant: `send`/`retry` claim the session by flipping
+  /// `status` to RUNNING with a null `activeJobId`, and the worker then claims
+  /// the *turn* by compare-and-setting its own job id onto that null — so two
+  /// jobs for one turn (a BullMQ retry racing a user-driven retry) can never
+  /// both run the agent loop.
+  activeJobId   String?
+  /// Monotonic claim counter, incremented inside the same atomic `updateMany`
+  /// that `chat.send` / `chat.retry` use to claim the session. It is the
+  /// generation segment of the BullMQ job id
+  /// (`chat-run-<sessionId>-<userMessageSeq>-g<runGeneration>`): every accepted
+  /// claim mints a distinct job, while a duplicate enqueue of the SAME claim
+  /// still collapses onto one job id, which is what keeps a double-submit from
+  /// billing the model twice.
+  /// LOAD-BEARING: deriving that generation from persisted rows instead (e.g.
+  /// counting assistant turns after the user message) collides whenever an
+  /// attempt fails without leaving rows behind — a missing OPENROUTER_API_KEY,
+  /// an auth rejection, a network failure on first dispatch — or whenever the
+  /// worker clears the previous attempt's partial rows before failing again.
+  /// BullMQ retains failed jobs for 24h and silently drops an `add()` with an
+  /// existing id, so a colliding id leaves the session RUNNING with no job on
+  /// its way to answer it: permanently wedged.
+  runGeneration Int               @default(0)
+  /// Monotonic `seq` allocator: the next per-session cursor value to hand out.
+  /// LOAD-BEARING, and the reason it exists rather than `MAX(seq) + 1`: a
+  /// cursor may never be RECYCLED. When a retry clears the previous attempt's
+  /// partial assistant rows, `MAX(seq) + 1` drops back onto the seq the client
+  /// already saw — and a client that reconnects with `Last-Event-ID: N` replays
+  /// `seq > N`, so it would never receive the replacement answer and its
+  /// transcript would stay partial forever. Deleting a row must not lower this
+  /// number; it only ever increments. Gaps are fine — the cursor has to be
+  /// ordered, not dense.
+  /// Writers floor it to `MAX(seq) + 1` before allocating, which is what makes
+  /// the additive `@default(0)` safe for sessions that predate the column.
+  nextSeq       Int               @default(0)
+
+  Messages ChatMessage[]
+
+  @@index([ownerId, updatedAt(sort: Desc)])
+  @@map("chat_session")
+}
+
+model ChatMessage {
+  id        String      @id @default(cuid(2))
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @default(now()) @updatedAt
+  sessionId String
+  Session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  /// Monotonic per-session cursor. LOAD-BEARING: it is the SSE `id:` field, the
+  /// `Last-Event-ID` replay cursor, and the upsert key the worker writes
+  /// streaming assistant turns under. The unique constraint below is what makes
+  /// a retried job idempotent instead of duplicating a turn. Allocated from
+  /// `ChatSession.nextSeq` — never from `MAX(seq) + 1` over rows that a retry
+  /// may have deleted.
+  seq   Int
+  role  ChatRole
+  /// Whether this row is final. LOAD-BEARING: the SSE endpoint stamps an `id:`
+  /// (and the client advances its replay cursor) ONLY for COMPLETE rows, on the
+  /// live path and the replay path alike. A streaming assistant turn is upserted
+  /// repeatedly under one `seq`, so a client that resumed from a partial would
+  /// ask for `seq > N` and never receive the final version of N.
+  ///
+  /// The default is COMPLETE, not STREAMING, for two reasons: rows written by
+  /// anything other than the streaming producer (every USER turn) are final the
+  /// moment they exist, and under this repo's `prisma db push` model (no
+  /// migration history, no backfill) every row that predates the column is a
+  /// finished message. The worker is the one writer that opts a row into
+  /// STREAMING, and it flips it back when the turn finalizes.
+  state ChatMessageState @default(COMPLETE)
+  /// AgentMessagePart[] from @starter/agent-runtime. A text part is
+  /// `{ type: "text", content: string }` — `content`, never `text`.
+  parts Json
+
+  @@unique([sessionId, seq])
+  @@index([sessionId, createdAt])
+  @@map("chat_message")
+}

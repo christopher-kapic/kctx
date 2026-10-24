@@ -1,0 +1,34 @@
+// The golden-path example feature — one private, owner-scoped list, built end
+// to end so the shape can be copied. See patterns/golden-path.md, which also
+// carries the file list to delete if the app has no use for Projects.
+
+/// A private note-to-self owned by exactly one user.
+///
+/// Deliberately boring: no slug, no money, no state machine. It exists so the
+/// conventions around it — owner scoping, a bounded list, a projection that is
+/// a disclosure boundary — have somewhere to be demonstrated.
+model Project {
+  id        String   @id @default(cuid(2))
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+  ownerId   String
+  Owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  /// Display name. The 120-character ceiling is enforced at the procedure
+  /// boundary (`projectName` in `packages/api/src/routers/projects.ts`), which
+  /// is where every write to this column goes through.
+  name      String
+  /// Optional free text. Nullable rather than defaulting to "": "the user has
+  /// not written anything" and "the user cleared what they wrote" are the same
+  /// fact here, and NULL says it without a sentinel the UI has to decode.
+  notes     String?
+
+  // No public URL, so no `slug` and no `publicId`: a project is addressed by
+  // its primary key and only ever to its owner.
+  //
+  // `ownerId` leads so the index serves both the foreign key and the list's
+  // `WHERE ownerId = $1 ORDER BY createdAt DESC` — equality column first,
+  // range column second, per the indexing rules in
+  // patterns/schema-guidelines.md.
+  @@index([ownerId, createdAt(sort: Desc)])
+  @@map("project")
+}

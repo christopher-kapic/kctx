@@ -1,0 +1,41 @@
+{
+  "title": "Proyectos",
+  "description": "Una lista privada. Solo tú puedes ver lo que hay aquí.",
+  "listTitle": "Tus proyectos",
+  "countLabel": "{{count}} cargados",
+  "loadFailed": "No se pudieron cargar los proyectos.",
+  "createdOn": "Creado el {{date}}",
+  "empty": {
+    "title": "Todavía no hay proyectos",
+    "description": "Crea el primero para ver cómo funciona esta página."
+  },
+  "fields": {
+    "name": "Nombre",
+    "namePlaceholder": "Pintar el cobertizo",
+    "notes": "Notas",
+    "notesDescription": "Opcional. Una nota para ti; nadie más puede leerla."
+  },
+  "actions": {
+    "new": "Nuevo proyecto",
+    "create": "Crear proyecto",
+    "creating": "Creando…",
+    "rowMenuAriaLabel": "Acciones para {{name}}"
+  },
+  "create": {
+    "title": "Crear proyecto",
+    "description": "Agrega un proyecto a tu lista.",
+    "success": "Proyecto creado"
+  },
+  "edit": {
+    "title": "Editar proyecto",
+    "description": "Cambia el nombre o las notas.",
+    "success": "Proyecto actualizado"
+  },
+  "delete": {
+    "title": "Eliminar proyecto",
+    "description": "Esto elimina permanentemente el proyecto y sus notas. No se puede deshacer.",
+    "typeNameToConfirm": "Escribe el nombre del proyecto para confirmar:",
+    "copyNameAriaLabel": "Copiar el nombre del proyecto",
+    "success": "Proyecto eliminado"
+  }
+}

@@ -1,15 +1,14 @@
-import { env } from "@kctx/env/server";
-import { PrismaLibSql } from "@prisma/adapter-libsql";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { env } from "@starter/env/shared";
 
 import { PrismaClient } from "../prisma/generated/client";
 
-const adapter = new PrismaLibSql({
-  url: env.DATABASE_URL,
-});
+export type { Prisma } from "../prisma/generated/client";
 
+const adapter = new PrismaPg({
+  connectionString: env.DATABASE_URL,
+  max: env.DATABASE_POOL_MAX,
+});
 const prisma = new PrismaClient({ adapter });
 
 export default prisma;
-
-export { AuthMethod, CloneStatus, EmbeddingStatus } from "../prisma/generated/enums";
-export type { AuthMethod as AuthMethodType, CloneStatus as CloneStatusType, EmbeddingStatus as EmbeddingStatusType } from "../prisma/generated/enums";

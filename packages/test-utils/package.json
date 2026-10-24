@@ -1,0 +1,26 @@
+{
+  "name": "@starter/test-utils",
+  "license": "UNLICENSED",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@starter/api": "workspace:*",
+    "@starter/auth": "workspace:*",
+    "@starter/db": "workspace:*",
+    "vitest": "catalog:",
+    "vitest-mock-extended": "catalog:"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@starter/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

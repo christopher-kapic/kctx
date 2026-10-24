@@ -1,15 +1,230 @@
 packages:
   - apps/*
   - packages/*
+minimumReleaseAge: 10080
+minimumReleaseAgeStrict: true
+minimumReleaseAgeIgnoreMissingTime: false
+# Explicit current-libc selection makes pnpm retain complete platform metadata,
+# including the publication dates needed by offline template removal.
+supportedArchitectures:
+  libc: [current]
+# Excludes for packages that fail the 7-day minimum-age check on re-resolution.
+# All previous entries (devalue, react-doctor, oxlint + bindings, i18next) were
+# audited on 2026-05-27, and the brace-expansion carve-out for GHSA-mh99-v99m-4gvg
+# aged out on 2026-07-30; every locked version is now ≥7 days old, so there are no
+# live carve-outs and the key is absent. Add it back (with the publish date) if a
+# future re-resolution flags a package as too young.
+# Security-fix carve-outs only — see patterns/dependency-vulnerabilities.md.
+# Each entry MUST carry a `drop-after: YYYY-MM-DD` marker in its comment. That
+# date is enforced by `pnpm deps:check-excludes` (CI lint job) — once it passes,
+# the build fails until the entry is deleted. Without it a carve-out taken for a
+# one-week security window quietly becomes a permanent exemption from the gate.
+# Restore as a block sequence, never flow style — the checker only parses blocks:
+#   minimumReleaseAgeExclude:
+#     # GHSA-xxxx-yyyy-zzzz: <pkg> <version> (released YYYY-MM-DD) is the only
+#     # version that clears the advisory and is <7 days old.
+#     # drop-after: YYYY-MM-DD
+#     - <pkg>
+# Each selector lifts a transitive out of its vulnerable range. All target
+# versions pass the 7-day minimumReleaseAge gate; selectors are scoped tight so
+# unrelated majors are untouched.
+overrides:
+  hono@<4.12.25: ">=4.12.25" # CVE-2026-54290 (CORS credential origin reflection)
+  picomatch@>=4 <4.0.4: ">=4.0.4" # CVE-2026-33671 (ReDoS via extglob)
+  defu@<6.1.5: ">=6.1.5" # CVE-2026-35209 (prototype pollution)
+  # GHSA-4c8g-83qw-93j6 (>=3.1.3), GHSA-v2hh-gcrm-f6hx (>=3.1.4), and
+  # GHSA-7p8r-x3mc-p8w7 (>=3.1.5) superseded the earlier CVE pins. Scoped to the v3 line only
+  # (v2 and v4 were never in the vulnerable range and v4 is a breaking major).
+  # Reached via ajv (prisma, react-doctor>conf).
+  fast-uri@>=3 <3.1.6: ">=3.1.6 <4"
+  undici@>=7 <7.29.1: ">=7.29.1 <8" # GHSA-rfgv-xxqx-mfg5 / GHSA-w293-vg96-wgc3 (DoS / TLS bypass)
+  ip-address@>=10 <10.3.1: ">=10.3.1 <11" # GHSA-mwp4-54f8-5fhr (SSRF)
+  # GHSA-52cp-r559-cp3m (prototype pollution) and GHSA-5p4m-2wfm-xmqj
+  # (quadratic CPU) in the schema loader. Scoped to the v4 line; v3 and v5 consumers are untouched. Reached via
+  # @expo/cli>@expo/xcpretty and @tanstack/start-plugin-core>xmlbuilder2.
+  js-yaml@>=4 <4.3.2: ">=4.3.2 <5"
+  # GHSA-r28c-9q8g-f849 — patched in 8.5.18. Most flagged paths are transitive
+  # (vite, vitest, @expo/metro-config) and a catalog bump would not re-resolve
+  # them; this override does. The catalog's own ^8.5.16 was separately re-resolved
+  # to 8.5.19 in the lockfile (overrides do not apply to `catalog:` specifiers).
+  postcss@<8.5.18: ">=8.5.18"
+  # brace-expansion DoS: GHSA-3jxr-9vmj-r5cp + GHSA-mh99-v99m-4gvg, both only
+  # patched on the v5 line (>=5.0.9); later recursion fixes raise the floor
+  # to 5.0.11. Scoped to
+  # >=3 so no v2 consumer is force-upgraded: brace-expansion v5's CJS build
+  # exports { expand } instead of a callable default, which a v2 consumer cannot
+  # call. Reached via react-doctor>eslint and expo>@expo/cli>glob>minimatch.
+  #
+  # As of the `filelist>minimatch` override below there is no minimatch v5 left
+  # in the tree, so this scoping currently protects nobody — it is kept because
+  # dropping it would force any FUTURE v2 consumer a dependency bump drags in
+  # onto an incompatible v5, and a range is cheaper than rediscovering that.
+  brace-expansion@>=3 <5.0.11: ">=5.0.11 <6" # GHSA-qhr7-859c-m2p7 / GHSA-6j4f-fj2g-mc7p (recursion DoS)
+  # The last v2 consumer of brace-expansion was
+  # vite-plugin-pwa>workbox-build>...>ejs>jake>filelist>minimatch@5, and the v2
+  # line has no fix for GHSA-mh99-v99m-4gvg (2.1.2 is its final release, still in
+  # the advisory's <=5.0.7 range). filelist only calls `minimatch.match`, which
+  # minimatch 10 still exports from its CommonJS build, so lifting that one
+  # consumer to v10 removes the vulnerable v2 copy instead of suppressing it.
+  "filelist>minimatch": ^10.2.5
+  # CVE-2026-44635 (JSON-path injection) is patched in 0.28.17. Pinned EXACT
+  # to the newest mature compatible release to keep a single kysely in the tree:
+  # better-auth peers `kysely ^0.28.17 || ^0.29.0`, and two copies of @better-auth/core split
+  # its types so a plugin stops being assignable to BetterAuthPlugin.
+  # kysely is only used transitively via better-auth here.
+  kysely: 0.29.6
+  path-to-regexp@>=8 <8.4.0: ">=8.4.0" # CVE-2026-4926 (ReDoS)
+  # Peer-range alignment after 2026-06 dependency refresh. These are scoped to
+  # the packages that declare the peers and all target releases are older than
+  # the 7-day minimumReleaseAge gate.
+  # Expo SDK 57 uses @expo/dom-webview ~57.0.1 and @expo/log-box ^57.0.3.
+  # Peer-injected instances do not honor scoped selectors, hence these exact
+  # package-level overrides. Both pins now pass the 7-day release-age gate.
+  "@expo/dom-webview": 57.0.1
+  "@expo/log-box": 57.0.4
+  # Auto-installed Metro peers must follow React Native in Expo SDK 57.
+  "@react-native/metro-config": 0.86.3
+  "vite-plugin-pwa@1.3.0>workbox-build": 7.4.1
+  # workbox-build transitives — vite-plugin-pwa 1.3.0 → workbox-build 7.4.1 is
+  # the latest upstream release and still pulls in vulnerable versions. Drop
+  # these overrides if workbox-build patches the chain.
+  serialize-javascript@<7.0.3: ">=7.0.3" # GHSA-5c6j-r48x-rmvq (RCE via RegExp.flags)
+  lodash@<4.18.0: ">=4.18.0" # GHSA-r5fr-rjxr-66jc (code injection via _.template)
+  "@babel/plugin-transform-modules-systemjs@<7.29.4": ">=7.29.4 <8" # GHSA-fv7c-fp4j-7gwp (preserve Babel 7 consumers)
+  "sharp-ico>sharp": ^0.35.5 # GHSA-wq5f-xc86-pv6w (librsvg) — vite-pwa icon generator chain
+  proxy-addr@>=1.1 <2.0.8: ">=2.0.8 <3" # GHSA-jqcg-44mw-7w3h (IP spoofing)
+  shell-quote@>=1.8.4 <1.11.0: ">=1.11.0 <2" # GHSA-pqg4-j6r4-53mv (command injection)
+  seroval@>=1 <1.6.3: ">=1.6.3 <2" # GHSA-jp82-f5mq-hwhp (memory exhaustion)
+  source-map-js@>=1 <1.2.2: ">=1.2.2 <2" # GHSA-68fv-2mgg-jv7q / CVE-2026-93749 (DoS)
+  compression@>=1 <1.8.2: ">=1.8.2 <2" # GHSA-vc2v-76pw-4v95 (memory exhaustion)
+  "@modelcontextprotocol/sdk@>=1.12 <1.31.0": ">=1.31.0 <2" # GHSA-6qxp-vccf-f47h (OAuth disclosure)
+  nanoid@>=3 <3.3.18: ">=3.3.18 <4" # GHSA-2v37-7h3g-55p8 (DoS)
+  deepmerge-ts@>=7 <8: ">=8.0.0 <9" # GHSA-ggr8-5vv4-36mx (stack exhaustion)
+  mysql2@<3.22.0: ">=3.22.0" # GHSA-3f6p-5ww8-9rcr (auth plugin downgrade)
+  "@xmldom/xmldom@<0.9.12": ">=0.9.12" # GHSA-2883-xcg3-v3hh (entity expansion DoS)
+blockExoticSubdeps: true
+dangerouslyAllowAllBuilds: false
+savePrefix: ""
+# Moved here from the package.json "pnpm" field, which pnpm 11 no longer reads.
+peerDependencyRules:
+  allowedVersions:
+    vite: "*"
+allowBuilds:
+  # Its postinstall is `node scripts/check-types.js || true` — a best-effort
+  # diagnostic that always exits 0 and produces nothing the runtime needs. Denied
+  # rather than allowed: skipping it costs nothing and keeps a third-party install
+  # script from running. Listed explicitly (not omitted) because an *undecided*
+  # package is what makes pnpm fail every `pnpm <script>` with ERR_PNPM_IGNORED_BUILDS.
+  '@openrouter/sdk': false
+  # tree-sitter-bash ships prebuilt tree-sitter-bash.wasm; the native binding is not needed.
+  tree-sitter-bash: false
+  '@prisma/engines': true
+  esbuild: true
+  lefthook: true
+  msgpackr-extract: true
+  msw: true
+  prisma: true
+  sharp: true
+# Catalog: single-version deps shared across workspace packages.
+# Bump versions HERE, not in individual package.json files. See patterns/dependencies.md.
 catalog:
-  dotenv: ^17.2.2
-  zod: ^4.1.13
-  typescript: ^5
-  "@types/node": ^22.13.14
-  hono: ^4.8.2
-  "@orpc/server": ^1.12.2
-  "@orpc/openapi": ^1.12.2
-  "@orpc/zod": ^1.12.2
-  better-auth: ^1.4.18
-  "@prisma/client": ^7.2.0
-  "@orpc/client": ^1.12.2
+  pg: ^8.23.1
+  "@babel/parser": 8.0.6
+  dotenv: ^18.0.5
+  zod: ^4.6.5
+  "@types/node": ^26.6.3
+  hono: ^4.13.12
+  "@orpc/server": ^1.15.4
+  "@orpc/openapi": ^1.15.4
+  "@orpc/zod": ^1.15.4
+  better-auth: 1.7.7
+  lucide-react: ^1.49.0
+  next-themes: ^0.4.6
+  # Web/UI React. `apps/native` deliberately does NOT use `catalog:` for react
+  # and react-dom — it pins the exact version Expo SDK 57 bundles (19.2.3, see
+  # expo/bundledNativeModules.json). That pin looks like catalog drift and has
+  # been "corrected" to `catalog:` by mistake; it is SDK alignment, and the two
+  # versions are expected to differ until an SDK bump moves the native one.
+  # Native @types/react and TypeScript likewise follow the SDK's supported
+  # ~19.2.4 / ~6.0.3 ranges, with mature floors pinned in its package.json.
+  react: ^19.3.0
+  react-dom: ^19.3.0
+  sileo: ^0.1.5
+  "@prisma/client": ^7.10.0
+  # Keep the Prisma CLI in lockstep with @prisma/client above — they must match.
+  # Consumed by packages/db and packages/db-applier via `catalog:`.
+  prisma: ^7.10.0
+  "@orpc/client": ^1.15.4
+  "@orpc/tanstack-query": ^1.15.4
+  "@types/react": ^19.3.0
+  "@types/react-dom": ^19.3.0
+  tailwindcss: ^4.3.3
+  typescript: ^7.0.2
+  vite: ^8.3.2
+  "@vitejs/plugin-react": ^6.1.1
+  postcss: ^8.5.28
+  "@tanstack/ai": 0.63.0
+  "@tanstack/ai-openai": 0.25.1
+  "@tanstack/ai-openrouter": 0.20.1
+  "@tanstack/react-form": ^1.33.5
+  "@tanstack/react-query": ^5.104.0
+  "@tanstack/react-query-devtools": ^5.104.0
+  "@tanstack/react-router": ^1.170.41
+  "@tanstack/react-router-devtools": ^1.167.2
+  "@tanstack/react-router-ssr-query": ^1.167.3
+  "@tanstack/react-start": ^1.168.60
+  tsx: ^4.23.15
+  vitest: ^5.0.3
+  vitest-mock-extended: ^5.1.1
+  rate-limiter-flexible: ^11.2.1
+  nodemailer: ^10.0.13 # GHSA-v53p-9fqp-m79j / GHSA-prgh-xp8r-p3m5 (address parser DoS)
+  "@types/nodemailer": ^8.0.2
+  bullmq: ^6.3.11
+  ioredis: ^6.0.0
+  tsdown: ^0.23.0
+  sharp: ^0.35.5 # GHSA-wq5f-xc86-pv6w (librsvg)
+  blurhash: ^2.0.5
+  "@aws-sdk/client-s3": ^3.1145.0
+  "@aws-sdk/s3-request-presigner": ^3.1145.0
+  react-markdown: ^10.1.0
+  i18next: ^26.4.2
+  react-i18next: ^17.0.15
+  i18next-browser-languagedetector: ^8.2.1
+  openai: ^7.25.0
+  "@anthropic-ai/sdk": ^0.131.0
+  # Keep the SDK version supported by @tanstack/ai-openrouter; SDK 1's HTTPClient
+  # is incompatible with the adapter's SDK 0.13.20. Direct dep so the runtime
+  # can inject Anthropic prompt-cache
+  # breakpoints via the SDK's HTTPClient beforeRequest hook. See adapters.ts.
+  "@openrouter/sdk": 0.13.20
+  "heic-to": ^1.6.5
+  "qrcode.react": ^4.2.0
+  "@fontsource-variable/roboto": ^5.3.0
+  "@better-auth/expo": 1.7.7
+  "@expo/metro-runtime": ~57.0.16
+  "@expo/vector-icons": ^15.1.1
+  "@gorhom/bottom-sheet": ^5.2.14
+  "expo": ~57.0.26
+  "expo-constants": ~57.0.20
+  "expo-font": ~57.0.4
+  "expo-haptics": ~57.0.3
+  "expo-linking": ~57.0.11
+  "expo-localization": ~57.0.2
+  "expo-network": ~57.0.2
+  "expo-router": ~57.0.24
+  "expo-secure-store": ~57.0.4
+  "expo-status-bar": ~57.0.1
+  "expo-web-browser": ~57.0.3
+  "heroui-native": ^1.0.10
+  "react-native": 0.86.3
+  "react-native-gesture-handler": ~2.32.0
+  "react-native-keyboard-controller": 1.21.9
+  "react-native-reanimated": 4.5.1
+  "react-native-safe-area-context": ~5.7.0
+  "react-native-screens": ~4.26.2
+  "react-native-svg": 15.15.4
+  "react-native-web": ~0.21.3
+  "react-native-worklets": 0.10.1
+  "tailwind-merge": ^3.7.0
+  "tailwind-variants": ^3.3.1
+  "uniwind": ^1.12.1

@@ -9,175 +9,288 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AuthenticatedTerminalRouteImport } from './routes/_authenticated/terminal'
-import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
-import { Route as AuthenticatedRepositoriesRouteImport } from './routes/_authenticated/repositories'
-import { Route as AuthenticatedPackagesRouteImport } from './routes/_authenticated/packages'
-import { Route as AuthenticatedModelsRouteImport } from './routes/_authenticated/models'
-import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
-import { Route as AuthenticatedApiKeysRouteImport } from './routes/_authenticated/api-keys'
-import { Route as AuthenticatedPackagesIdentifierChatRouteImport } from './routes/_authenticated/packages_.$identifier.chat'
+import { Route as LangRouteImport } from './routes/$lang'
+import { Route as LangAppRouteRouteImport } from './routes/$lang/_app/route'
+import { Route as LangPublicRouteRouteImport } from './routes/$lang/_public/route'
+import { Route as LangAppAuthRouteImport } from './routes/$lang/_app/_auth'
+import { Route as LangAppAdminRouteImport } from './routes/$lang/_app/admin'
+import { Route as LangAppForgotPasswordRouteImport } from './routes/$lang/_app/forgot-password'
+import { Route as LangAppLoginRouteImport } from './routes/$lang/_app/login'
+import { Route as LangAppResetPasswordRouteImport } from './routes/$lang/_app/reset-password'
+import { Route as LangAppSignupRouteImport } from './routes/$lang/_app/signup'
+import { Route as LangAppVerifyEmailRouteImport } from './routes/$lang/_app/verify-email'
+import { Route as LangPublicIndexRouteImport } from './routes/$lang/_public/index'
+import { Route as LangAppAuthChatRouteImport } from './routes/$lang/_app/_auth/chat'
+import { Route as LangAppAuthDashboardRouteImport } from './routes/$lang/_app/_auth/dashboard'
+import { Route as LangAppAuthProjectsRouteImport } from './routes/$lang/_app/_auth/projects'
+import { Route as LangAppAuthSettingsRouteImport } from './routes/$lang/_app/_auth/settings'
+import { Route as LangAppAdminIndexRouteImport } from './routes/$lang/_app/admin/index'
+import { Route as LangAppAdminJobsRouteImport } from './routes/$lang/_app/admin/jobs'
+import { Route as LangAppAdminSeedRouteImport } from './routes/$lang/_app/admin/seed'
+import { Route as LangAppAdminSettingsRouteImport } from './routes/$lang/_app/admin/settings'
+import { Route as LangAppAdminUsersRouteImport } from './routes/$lang/_app/admin/users'
+import { Route as LangAppAuthSettingsIndexRouteImport } from './routes/$lang/_app/_auth/settings/index'
+import { Route as LangAppAuthSettingsSecurityRouteImport } from './routes/$lang/_app/_auth/settings/security'
 
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthenticatedRoute = AuthenticatedRouteImport.update({
-  id: '/_authenticated',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedTerminalRoute = AuthenticatedTerminalRouteImport.update({
-  id: '/terminal',
-  path: '/terminal',
-  getParentRoute: () => AuthenticatedRoute,
+const LangRoute = LangRouteImport.update({
+  id: '/$lang',
+  path: '/$lang',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AuthenticatedRoute,
+const LangAppRouteRoute = LangAppRouteRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => LangRoute,
 } as any)
-const AuthenticatedRepositoriesRoute =
-  AuthenticatedRepositoriesRouteImport.update({
-    id: '/repositories',
-    path: '/repositories',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedPackagesRoute = AuthenticatedPackagesRouteImport.update({
-  id: '/packages',
-  path: '/packages',
-  getParentRoute: () => AuthenticatedRoute,
+const LangPublicRouteRoute = LangPublicRouteRouteImport.update({
+  id: '/_public',
+  getParentRoute: () => LangRoute,
 } as any)
-const AuthenticatedModelsRoute = AuthenticatedModelsRouteImport.update({
-  id: '/models',
-  path: '/models',
-  getParentRoute: () => AuthenticatedRoute,
+const LangAppAuthRoute = LangAppAuthRouteImport.update({
+  id: '/_auth',
+  getParentRoute: () => LangAppRouteRoute,
 } as any)
-const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+const LangAppAdminRoute = LangAppAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => LangAppRouteRoute,
+} as any)
+const LangAppForgotPasswordRoute = LangAppForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => LangAppRouteRoute,
+} as any)
+const LangAppLoginRoute = LangAppLoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => LangAppRouteRoute,
+} as any)
+const LangAppResetPasswordRoute = LangAppResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => LangAppRouteRoute,
+} as any)
+const LangAppSignupRoute = LangAppSignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => LangAppRouteRoute,
+} as any)
+const LangAppVerifyEmailRoute = LangAppVerifyEmailRouteImport.update({
+  id: '/verify-email',
+  path: '/verify-email',
+  getParentRoute: () => LangAppRouteRoute,
+} as any)
+const LangPublicIndexRoute = LangPublicIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => LangPublicRouteRoute,
+} as any)
+const LangAppAuthChatRoute = LangAppAuthChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
+  getParentRoute: () => LangAppAuthRoute,
+} as any)
+const LangAppAuthDashboardRoute = LangAppAuthDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
-  getParentRoute: () => AuthenticatedRoute,
+  getParentRoute: () => LangAppAuthRoute,
 } as any)
-const AuthenticatedApiKeysRoute = AuthenticatedApiKeysRouteImport.update({
-  id: '/api-keys',
-  path: '/api-keys',
-  getParentRoute: () => AuthenticatedRoute,
+const LangAppAuthProjectsRoute = LangAppAuthProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
+  getParentRoute: () => LangAppAuthRoute,
 } as any)
-const AuthenticatedPackagesIdentifierChatRoute =
-  AuthenticatedPackagesIdentifierChatRouteImport.update({
-    id: '/packages_/$identifier/chat',
-    path: '/packages/$identifier/chat',
-    getParentRoute: () => AuthenticatedRoute,
+const LangAppAuthSettingsRoute = LangAppAuthSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => LangAppAuthRoute,
+} as any)
+const LangAppAdminIndexRoute = LangAppAdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => LangAppAdminRoute,
+} as any)
+const LangAppAdminJobsRoute = LangAppAdminJobsRouteImport.update({
+  id: '/jobs',
+  path: '/jobs',
+  getParentRoute: () => LangAppAdminRoute,
+} as any)
+const LangAppAdminSeedRoute = LangAppAdminSeedRouteImport.update({
+  id: '/seed',
+  path: '/seed',
+  getParentRoute: () => LangAppAdminRoute,
+} as any)
+const LangAppAdminSettingsRoute = LangAppAdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => LangAppAdminRoute,
+} as any)
+const LangAppAdminUsersRoute = LangAppAdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => LangAppAdminRoute,
+} as any)
+const LangAppAuthSettingsIndexRoute =
+  LangAppAuthSettingsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => LangAppAuthSettingsRoute,
+  } as any)
+const LangAppAuthSettingsSecurityRoute =
+  LangAppAuthSettingsSecurityRouteImport.update({
+    id: '/security',
+    path: '/security',
+    getParentRoute: () => LangAppAuthSettingsRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/login': typeof LoginRoute
-  '/api-keys': typeof AuthenticatedApiKeysRoute
-  '/dashboard': typeof AuthenticatedDashboardRoute
-  '/models': typeof AuthenticatedModelsRoute
-  '/packages': typeof AuthenticatedPackagesRoute
-  '/repositories': typeof AuthenticatedRepositoriesRoute
-  '/settings': typeof AuthenticatedSettingsRoute
-  '/terminal': typeof AuthenticatedTerminalRoute
-  '/packages/$identifier/chat': typeof AuthenticatedPackagesIdentifierChatRoute
+  '/$lang': typeof LangRouteWithChildren
+  '/$lang/admin': typeof LangAppAdminRouteWithChildren
+  '/$lang/forgot-password': typeof LangAppForgotPasswordRoute
+  '/$lang/login': typeof LangAppLoginRoute
+  '/$lang/reset-password': typeof LangAppResetPasswordRoute
+  '/$lang/signup': typeof LangAppSignupRoute
+  '/$lang/verify-email': typeof LangAppVerifyEmailRoute
+  '/$lang/': typeof LangPublicIndexRoute
+  '/$lang/chat': typeof LangAppAuthChatRoute
+  '/$lang/dashboard': typeof LangAppAuthDashboardRoute
+  '/$lang/projects': typeof LangAppAuthProjectsRoute
+  '/$lang/settings': typeof LangAppAuthSettingsRouteWithChildren
+  '/$lang/admin/jobs': typeof LangAppAdminJobsRoute
+  '/$lang/admin/seed': typeof LangAppAdminSeedRoute
+  '/$lang/admin/settings': typeof LangAppAdminSettingsRoute
+  '/$lang/admin/users': typeof LangAppAdminUsersRoute
+  '/$lang/admin/': typeof LangAppAdminIndexRoute
+  '/$lang/settings/security': typeof LangAppAuthSettingsSecurityRoute
+  '/$lang/settings/': typeof LangAppAuthSettingsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/login': typeof LoginRoute
-  '/api-keys': typeof AuthenticatedApiKeysRoute
-  '/dashboard': typeof AuthenticatedDashboardRoute
-  '/models': typeof AuthenticatedModelsRoute
-  '/packages': typeof AuthenticatedPackagesRoute
-  '/repositories': typeof AuthenticatedRepositoriesRoute
-  '/settings': typeof AuthenticatedSettingsRoute
-  '/terminal': typeof AuthenticatedTerminalRoute
-  '/packages/$identifier/chat': typeof AuthenticatedPackagesIdentifierChatRoute
+  '/$lang': typeof LangPublicIndexRoute
+  '/$lang/forgot-password': typeof LangAppForgotPasswordRoute
+  '/$lang/login': typeof LangAppLoginRoute
+  '/$lang/reset-password': typeof LangAppResetPasswordRoute
+  '/$lang/signup': typeof LangAppSignupRoute
+  '/$lang/verify-email': typeof LangAppVerifyEmailRoute
+  '/$lang/chat': typeof LangAppAuthChatRoute
+  '/$lang/dashboard': typeof LangAppAuthDashboardRoute
+  '/$lang/projects': typeof LangAppAuthProjectsRoute
+  '/$lang/admin/jobs': typeof LangAppAdminJobsRoute
+  '/$lang/admin/seed': typeof LangAppAdminSeedRoute
+  '/$lang/admin/settings': typeof LangAppAdminSettingsRoute
+  '/$lang/admin/users': typeof LangAppAdminUsersRoute
+  '/$lang/admin': typeof LangAppAdminIndexRoute
+  '/$lang/settings/security': typeof LangAppAuthSettingsSecurityRoute
+  '/$lang/settings': typeof LangAppAuthSettingsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/_authenticated': typeof AuthenticatedRouteWithChildren
-  '/login': typeof LoginRoute
-  '/_authenticated/api-keys': typeof AuthenticatedApiKeysRoute
-  '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
-  '/_authenticated/models': typeof AuthenticatedModelsRoute
-  '/_authenticated/packages': typeof AuthenticatedPackagesRoute
-  '/_authenticated/repositories': typeof AuthenticatedRepositoriesRoute
-  '/_authenticated/settings': typeof AuthenticatedSettingsRoute
-  '/_authenticated/terminal': typeof AuthenticatedTerminalRoute
-  '/_authenticated/packages_/$identifier/chat': typeof AuthenticatedPackagesIdentifierChatRoute
+  '/$lang': typeof LangRouteWithChildren
+  '/$lang/_app': typeof LangAppRouteRouteWithChildren
+  '/$lang/_public': typeof LangPublicRouteRouteWithChildren
+  '/$lang/_app/_auth': typeof LangAppAuthRouteWithChildren
+  '/$lang/_app/admin': typeof LangAppAdminRouteWithChildren
+  '/$lang/_app/forgot-password': typeof LangAppForgotPasswordRoute
+  '/$lang/_app/login': typeof LangAppLoginRoute
+  '/$lang/_app/reset-password': typeof LangAppResetPasswordRoute
+  '/$lang/_app/signup': typeof LangAppSignupRoute
+  '/$lang/_app/verify-email': typeof LangAppVerifyEmailRoute
+  '/$lang/_public/': typeof LangPublicIndexRoute
+  '/$lang/_app/_auth/chat': typeof LangAppAuthChatRoute
+  '/$lang/_app/_auth/dashboard': typeof LangAppAuthDashboardRoute
+  '/$lang/_app/_auth/projects': typeof LangAppAuthProjectsRoute
+  '/$lang/_app/_auth/settings': typeof LangAppAuthSettingsRouteWithChildren
+  '/$lang/_app/admin/jobs': typeof LangAppAdminJobsRoute
+  '/$lang/_app/admin/seed': typeof LangAppAdminSeedRoute
+  '/$lang/_app/admin/settings': typeof LangAppAdminSettingsRoute
+  '/$lang/_app/admin/users': typeof LangAppAdminUsersRoute
+  '/$lang/_app/admin/': typeof LangAppAdminIndexRoute
+  '/$lang/_app/_auth/settings/security': typeof LangAppAuthSettingsSecurityRoute
+  '/$lang/_app/_auth/settings/': typeof LangAppAuthSettingsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/login'
-    | '/api-keys'
-    | '/dashboard'
-    | '/models'
-    | '/packages'
-    | '/repositories'
-    | '/settings'
-    | '/terminal'
-    | '/packages/$identifier/chat'
+    | '/$lang'
+    | '/$lang/admin'
+    | '/$lang/forgot-password'
+    | '/$lang/login'
+    | '/$lang/reset-password'
+    | '/$lang/signup'
+    | '/$lang/verify-email'
+    | '/$lang/'
+    | '/$lang/chat'
+    | '/$lang/dashboard'
+    | '/$lang/projects'
+    | '/$lang/settings'
+    | '/$lang/admin/jobs'
+    | '/$lang/admin/seed'
+    | '/$lang/admin/settings'
+    | '/$lang/admin/users'
+    | '/$lang/admin/'
+    | '/$lang/settings/security'
+    | '/$lang/settings/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/login'
-    | '/api-keys'
-    | '/dashboard'
-    | '/models'
-    | '/packages'
-    | '/repositories'
-    | '/settings'
-    | '/terminal'
-    | '/packages/$identifier/chat'
+    | '/$lang'
+    | '/$lang/forgot-password'
+    | '/$lang/login'
+    | '/$lang/reset-password'
+    | '/$lang/signup'
+    | '/$lang/verify-email'
+    | '/$lang/chat'
+    | '/$lang/dashboard'
+    | '/$lang/projects'
+    | '/$lang/admin/jobs'
+    | '/$lang/admin/seed'
+    | '/$lang/admin/settings'
+    | '/$lang/admin/users'
+    | '/$lang/admin'
+    | '/$lang/settings/security'
+    | '/$lang/settings'
   id:
     | '__root__'
     | '/'
-    | '/_authenticated'
-    | '/login'
-    | '/_authenticated/api-keys'
-    | '/_authenticated/dashboard'
-    | '/_authenticated/models'
-    | '/_authenticated/packages'
-    | '/_authenticated/repositories'
-    | '/_authenticated/settings'
-    | '/_authenticated/terminal'
-    | '/_authenticated/packages_/$identifier/chat'
+    | '/$lang'
+    | '/$lang/_app'
+    | '/$lang/_public'
+    | '/$lang/_app/_auth'
+    | '/$lang/_app/admin'
+    | '/$lang/_app/forgot-password'
+    | '/$lang/_app/login'
+    | '/$lang/_app/reset-password'
+    | '/$lang/_app/signup'
+    | '/$lang/_app/verify-email'
+    | '/$lang/_public/'
+    | '/$lang/_app/_auth/chat'
+    | '/$lang/_app/_auth/dashboard'
+    | '/$lang/_app/_auth/projects'
+    | '/$lang/_app/_auth/settings'
+    | '/$lang/_app/admin/jobs'
+    | '/$lang/_app/admin/seed'
+    | '/$lang/_app/admin/settings'
+    | '/$lang/_app/admin/users'
+    | '/$lang/_app/admin/'
+    | '/$lang/_app/_auth/settings/security'
+    | '/$lang/_app/_auth/settings/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
-  LoginRoute: typeof LoginRoute
+  LangRoute: typeof LangRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated': {
-      id: '/_authenticated'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof AuthenticatedRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -185,97 +298,275 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/terminal': {
-      id: '/_authenticated/terminal'
-      path: '/terminal'
-      fullPath: '/terminal'
-      preLoaderRoute: typeof AuthenticatedTerminalRouteImport
-      parentRoute: typeof AuthenticatedRoute
+    '/$lang': {
+      id: '/$lang'
+      path: '/$lang'
+      fullPath: '/$lang'
+      preLoaderRoute: typeof LangRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/settings': {
-      id: '/_authenticated/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
-      parentRoute: typeof AuthenticatedRoute
+    '/$lang/_app': {
+      id: '/$lang/_app'
+      path: ''
+      fullPath: '/$lang'
+      preLoaderRoute: typeof LangAppRouteRouteImport
+      parentRoute: typeof LangRoute
     }
-    '/_authenticated/repositories': {
-      id: '/_authenticated/repositories'
-      path: '/repositories'
-      fullPath: '/repositories'
-      preLoaderRoute: typeof AuthenticatedRepositoriesRouteImport
-      parentRoute: typeof AuthenticatedRoute
+    '/$lang/_public': {
+      id: '/$lang/_public'
+      path: ''
+      fullPath: '/$lang'
+      preLoaderRoute: typeof LangPublicRouteRouteImport
+      parentRoute: typeof LangRoute
     }
-    '/_authenticated/packages': {
-      id: '/_authenticated/packages'
-      path: '/packages'
-      fullPath: '/packages'
-      preLoaderRoute: typeof AuthenticatedPackagesRouteImport
-      parentRoute: typeof AuthenticatedRoute
+    '/$lang/_app/_auth': {
+      id: '/$lang/_app/_auth'
+      path: ''
+      fullPath: '/$lang'
+      preLoaderRoute: typeof LangAppAuthRouteImport
+      parentRoute: typeof LangAppRouteRoute
     }
-    '/_authenticated/models': {
-      id: '/_authenticated/models'
-      path: '/models'
-      fullPath: '/models'
-      preLoaderRoute: typeof AuthenticatedModelsRouteImport
-      parentRoute: typeof AuthenticatedRoute
+    '/$lang/_app/admin': {
+      id: '/$lang/_app/admin'
+      path: '/admin'
+      fullPath: '/$lang/admin'
+      preLoaderRoute: typeof LangAppAdminRouteImport
+      parentRoute: typeof LangAppRouteRoute
     }
-    '/_authenticated/dashboard': {
-      id: '/_authenticated/dashboard'
+    '/$lang/_app/forgot-password': {
+      id: '/$lang/_app/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/$lang/forgot-password'
+      preLoaderRoute: typeof LangAppForgotPasswordRouteImport
+      parentRoute: typeof LangAppRouteRoute
+    }
+    '/$lang/_app/login': {
+      id: '/$lang/_app/login'
+      path: '/login'
+      fullPath: '/$lang/login'
+      preLoaderRoute: typeof LangAppLoginRouteImport
+      parentRoute: typeof LangAppRouteRoute
+    }
+    '/$lang/_app/reset-password': {
+      id: '/$lang/_app/reset-password'
+      path: '/reset-password'
+      fullPath: '/$lang/reset-password'
+      preLoaderRoute: typeof LangAppResetPasswordRouteImport
+      parentRoute: typeof LangAppRouteRoute
+    }
+    '/$lang/_app/signup': {
+      id: '/$lang/_app/signup'
+      path: '/signup'
+      fullPath: '/$lang/signup'
+      preLoaderRoute: typeof LangAppSignupRouteImport
+      parentRoute: typeof LangAppRouteRoute
+    }
+    '/$lang/_app/verify-email': {
+      id: '/$lang/_app/verify-email'
+      path: '/verify-email'
+      fullPath: '/$lang/verify-email'
+      preLoaderRoute: typeof LangAppVerifyEmailRouteImport
+      parentRoute: typeof LangAppRouteRoute
+    }
+    '/$lang/_public/': {
+      id: '/$lang/_public/'
+      path: '/'
+      fullPath: '/$lang/'
+      preLoaderRoute: typeof LangPublicIndexRouteImport
+      parentRoute: typeof LangPublicRouteRoute
+    }
+    '/$lang/_app/_auth/chat': {
+      id: '/$lang/_app/_auth/chat'
+      path: '/chat'
+      fullPath: '/$lang/chat'
+      preLoaderRoute: typeof LangAppAuthChatRouteImport
+      parentRoute: typeof LangAppAuthRoute
+    }
+    '/$lang/_app/_auth/dashboard': {
+      id: '/$lang/_app/_auth/dashboard'
       path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
-      parentRoute: typeof AuthenticatedRoute
+      fullPath: '/$lang/dashboard'
+      preLoaderRoute: typeof LangAppAuthDashboardRouteImport
+      parentRoute: typeof LangAppAuthRoute
     }
-    '/_authenticated/api-keys': {
-      id: '/_authenticated/api-keys'
-      path: '/api-keys'
-      fullPath: '/api-keys'
-      preLoaderRoute: typeof AuthenticatedApiKeysRouteImport
-      parentRoute: typeof AuthenticatedRoute
+    '/$lang/_app/_auth/projects': {
+      id: '/$lang/_app/_auth/projects'
+      path: '/projects'
+      fullPath: '/$lang/projects'
+      preLoaderRoute: typeof LangAppAuthProjectsRouteImport
+      parentRoute: typeof LangAppAuthRoute
     }
-    '/_authenticated/packages_/$identifier/chat': {
-      id: '/_authenticated/packages_/$identifier/chat'
-      path: '/packages/$identifier/chat'
-      fullPath: '/packages/$identifier/chat'
-      preLoaderRoute: typeof AuthenticatedPackagesIdentifierChatRouteImport
-      parentRoute: typeof AuthenticatedRoute
+    '/$lang/_app/_auth/settings': {
+      id: '/$lang/_app/_auth/settings'
+      path: '/settings'
+      fullPath: '/$lang/settings'
+      preLoaderRoute: typeof LangAppAuthSettingsRouteImport
+      parentRoute: typeof LangAppAuthRoute
+    }
+    '/$lang/_app/admin/': {
+      id: '/$lang/_app/admin/'
+      path: '/'
+      fullPath: '/$lang/admin/'
+      preLoaderRoute: typeof LangAppAdminIndexRouteImport
+      parentRoute: typeof LangAppAdminRoute
+    }
+    '/$lang/_app/admin/jobs': {
+      id: '/$lang/_app/admin/jobs'
+      path: '/jobs'
+      fullPath: '/$lang/admin/jobs'
+      preLoaderRoute: typeof LangAppAdminJobsRouteImport
+      parentRoute: typeof LangAppAdminRoute
+    }
+    '/$lang/_app/admin/seed': {
+      id: '/$lang/_app/admin/seed'
+      path: '/seed'
+      fullPath: '/$lang/admin/seed'
+      preLoaderRoute: typeof LangAppAdminSeedRouteImport
+      parentRoute: typeof LangAppAdminRoute
+    }
+    '/$lang/_app/admin/settings': {
+      id: '/$lang/_app/admin/settings'
+      path: '/settings'
+      fullPath: '/$lang/admin/settings'
+      preLoaderRoute: typeof LangAppAdminSettingsRouteImport
+      parentRoute: typeof LangAppAdminRoute
+    }
+    '/$lang/_app/admin/users': {
+      id: '/$lang/_app/admin/users'
+      path: '/users'
+      fullPath: '/$lang/admin/users'
+      preLoaderRoute: typeof LangAppAdminUsersRouteImport
+      parentRoute: typeof LangAppAdminRoute
+    }
+    '/$lang/_app/_auth/settings/': {
+      id: '/$lang/_app/_auth/settings/'
+      path: '/'
+      fullPath: '/$lang/settings/'
+      preLoaderRoute: typeof LangAppAuthSettingsIndexRouteImport
+      parentRoute: typeof LangAppAuthSettingsRoute
+    }
+    '/$lang/_app/_auth/settings/security': {
+      id: '/$lang/_app/_auth/settings/security'
+      path: '/security'
+      fullPath: '/$lang/settings/security'
+      preLoaderRoute: typeof LangAppAuthSettingsSecurityRouteImport
+      parentRoute: typeof LangAppAuthSettingsRoute
     }
   }
 }
 
-interface AuthenticatedRouteChildren {
-  AuthenticatedApiKeysRoute: typeof AuthenticatedApiKeysRoute
-  AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
-  AuthenticatedModelsRoute: typeof AuthenticatedModelsRoute
-  AuthenticatedPackagesRoute: typeof AuthenticatedPackagesRoute
-  AuthenticatedRepositoriesRoute: typeof AuthenticatedRepositoriesRoute
-  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
-  AuthenticatedTerminalRoute: typeof AuthenticatedTerminalRoute
-  AuthenticatedPackagesIdentifierChatRoute: typeof AuthenticatedPackagesIdentifierChatRoute
+interface LangAppAuthSettingsRouteChildren {
+  LangAppAuthSettingsSecurityRoute: typeof LangAppAuthSettingsSecurityRoute
+  LangAppAuthSettingsIndexRoute: typeof LangAppAuthSettingsIndexRoute
 }
 
-const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
-  AuthenticatedApiKeysRoute: AuthenticatedApiKeysRoute,
-  AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
-  AuthenticatedModelsRoute: AuthenticatedModelsRoute,
-  AuthenticatedPackagesRoute: AuthenticatedPackagesRoute,
-  AuthenticatedRepositoriesRoute: AuthenticatedRepositoriesRoute,
-  AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
-  AuthenticatedTerminalRoute: AuthenticatedTerminalRoute,
-  AuthenticatedPackagesIdentifierChatRoute:
-    AuthenticatedPackagesIdentifierChatRoute,
+const LangAppAuthSettingsRouteChildren: LangAppAuthSettingsRouteChildren = {
+  LangAppAuthSettingsSecurityRoute: LangAppAuthSettingsSecurityRoute,
+  LangAppAuthSettingsIndexRoute: LangAppAuthSettingsIndexRoute,
 }
 
-const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
-  AuthenticatedRouteChildren,
+const LangAppAuthSettingsRouteWithChildren =
+  LangAppAuthSettingsRoute._addFileChildren(LangAppAuthSettingsRouteChildren)
+
+interface LangAppAuthRouteChildren {
+  LangAppAuthChatRoute: typeof LangAppAuthChatRoute
+  LangAppAuthDashboardRoute: typeof LangAppAuthDashboardRoute
+  LangAppAuthProjectsRoute: typeof LangAppAuthProjectsRoute
+  LangAppAuthSettingsRoute: typeof LangAppAuthSettingsRouteWithChildren
+}
+
+const LangAppAuthRouteChildren: LangAppAuthRouteChildren = {
+  LangAppAuthChatRoute: LangAppAuthChatRoute,
+  LangAppAuthDashboardRoute: LangAppAuthDashboardRoute,
+  LangAppAuthProjectsRoute: LangAppAuthProjectsRoute,
+  LangAppAuthSettingsRoute: LangAppAuthSettingsRouteWithChildren,
+}
+
+const LangAppAuthRouteWithChildren = LangAppAuthRoute._addFileChildren(
+  LangAppAuthRouteChildren,
 )
+
+interface LangAppAdminRouteChildren {
+  LangAppAdminJobsRoute: typeof LangAppAdminJobsRoute
+  LangAppAdminSeedRoute: typeof LangAppAdminSeedRoute
+  LangAppAdminSettingsRoute: typeof LangAppAdminSettingsRoute
+  LangAppAdminUsersRoute: typeof LangAppAdminUsersRoute
+  LangAppAdminIndexRoute: typeof LangAppAdminIndexRoute
+}
+
+const LangAppAdminRouteChildren: LangAppAdminRouteChildren = {
+  LangAppAdminJobsRoute: LangAppAdminJobsRoute,
+  LangAppAdminSeedRoute: LangAppAdminSeedRoute,
+  LangAppAdminSettingsRoute: LangAppAdminSettingsRoute,
+  LangAppAdminUsersRoute: LangAppAdminUsersRoute,
+  LangAppAdminIndexRoute: LangAppAdminIndexRoute,
+}
+
+const LangAppAdminRouteWithChildren = LangAppAdminRoute._addFileChildren(
+  LangAppAdminRouteChildren,
+)
+
+interface LangAppRouteRouteChildren {
+  LangAppAuthRoute: typeof LangAppAuthRouteWithChildren
+  LangAppAdminRoute: typeof LangAppAdminRouteWithChildren
+  LangAppForgotPasswordRoute: typeof LangAppForgotPasswordRoute
+  LangAppLoginRoute: typeof LangAppLoginRoute
+  LangAppResetPasswordRoute: typeof LangAppResetPasswordRoute
+  LangAppSignupRoute: typeof LangAppSignupRoute
+  LangAppVerifyEmailRoute: typeof LangAppVerifyEmailRoute
+}
+
+const LangAppRouteRouteChildren: LangAppRouteRouteChildren = {
+  LangAppAuthRoute: LangAppAuthRouteWithChildren,
+  LangAppAdminRoute: LangAppAdminRouteWithChildren,
+  LangAppForgotPasswordRoute: LangAppForgotPasswordRoute,
+  LangAppLoginRoute: LangAppLoginRoute,
+  LangAppResetPasswordRoute: LangAppResetPasswordRoute,
+  LangAppSignupRoute: LangAppSignupRoute,
+  LangAppVerifyEmailRoute: LangAppVerifyEmailRoute,
+}
+
+const LangAppRouteRouteWithChildren = LangAppRouteRoute._addFileChildren(
+  LangAppRouteRouteChildren,
+)
+
+interface LangPublicRouteRouteChildren {
+  LangPublicIndexRoute: typeof LangPublicIndexRoute
+}
+
+const LangPublicRouteRouteChildren: LangPublicRouteRouteChildren = {
+  LangPublicIndexRoute: LangPublicIndexRoute,
+}
+
+const LangPublicRouteRouteWithChildren = LangPublicRouteRoute._addFileChildren(
+  LangPublicRouteRouteChildren,
+)
+
+interface LangRouteChildren {
+  LangAppRouteRoute: typeof LangAppRouteRouteWithChildren
+  LangPublicRouteRoute: typeof LangPublicRouteRouteWithChildren
+}
+
+const LangRouteChildren: LangRouteChildren = {
+  LangAppRouteRoute: LangAppRouteRouteWithChildren,
+  LangPublicRouteRoute: LangPublicRouteRouteWithChildren,
+}
+
+const LangRouteWithChildren = LangRoute._addFileChildren(LangRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AuthenticatedRoute: AuthenticatedRouteWithChildren,
-  LoginRoute: LoginRoute,
+  LangRoute: LangRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

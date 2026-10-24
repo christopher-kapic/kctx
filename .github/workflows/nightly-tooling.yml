@@ -1,0 +1,82 @@
+# Nightly self-tests for the template's own tooling: the checkers, hooks, and
+# scripts that guard this repo, rather than the repo's product code. These
+# verify the guards themselves still catch what they claim to catch.
+#
+# This workflow is the ONLY per-interval home for the tooling self-tests:
+# PR checks run the enforcement legs (the checkers themselves) but not their
+# self-tests, so a checker that breaks through an indirect dependency bump
+# (node, tsx, glob semantics) is surfaced here within a day even on a quiet
+# default branch. `pnpm verify` at release time runs them once more before
+# anything ships. The exception is `template:remove:test`, which runs only
+# here and in `release.yml`: it regenerates a pruned workspace's lockfile
+# with `pnpm install --offline`, so it needs the pnpm metadata mirror a full
+# install and explicit temporary-workspace preparation populate.
+#
+# `pnpm verify:tooling` is exactly the set of steps that were split out of
+# `pnpm verify` when it was split into the fast pre-handoff gate
+# (`pnpm verify:fast`) and the full CI/release gate (`pnpm verify`).
+name: Nightly tooling self-tests
+
+on:
+  schedule:
+    # 03:30 UTC — quiet hour, off the top of the hour to dodge cron congestion.
+    - cron: "30 3 * * *"
+  # Manual trigger for testing the workflow or re-running a failure outside the
+  # schedule.
+  workflow_dispatch:
+
+# Least-privilege token: the self-tests only read the repo.
+permissions:
+  contents: read
+
+# One nightly run at a time; a superseded scheduled run is cancelled.
+concurrency:
+  group: nightly-tooling
+  cancel-in-progress: true
+
+jobs:
+  tooling-self-tests:
+    name: Tooling self-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Template-maintainer checks. Once a derived app completes onboarding
+    # (getting-started Phase 2 creates ./notes/), these self-tests no longer
+    # describe that repo and would burn CI minutes forever — skip them
+    # automatically. hashFiles() is empty when notes/ has no files, i.e. this
+    # repository or a not-yet-onboarded copy, which is exactly when the job
+    # should run. Evaluate at step scope after checkout: hashFiles() is not
+    # available in a job-level if. Manual dispatch always runs (maintainers may have notes/
+    # locally in a scratch clone). Belt-and-braces: Phase 7 of getting-started
+    # tells the app's agent it may delete this file outright.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          # The inert secret-scanner wrapper test resolves HEAD and HEAD^.
+          fetch-depth: 2
+
+      - name: Set up pnpm
+        if: hashFiles('notes/**') == '' || github.event_name == 'workflow_dispatch'
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413  # v6.1.0
+
+      - name: Set up Node
+        if: hashFiles('notes/**') == '' || github.event_name == 'workflow_dispatch'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        if: hashFiles('notes/**') == '' || github.event_name == 'workflow_dispatch'
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare offline removal metadata
+        if: hashFiles('notes/**') == '' || github.event_name == 'workflow_dispatch'
+        run: pnpm template:remove --prepare-cache
+
+      # Everything below is offline and DB/Redis-free: policy-checker fixture
+      # runs, the Claude hook deny-rule suite, the trufflehog filter's stubbed
+      # CLI tests, and the Dokploy config / template-removal test bundles.
+      - name: Run tooling self-tests
+        if: hashFiles('notes/**') == '' || github.event_name == 'workflow_dispatch'
+        run: pnpm verify:tooling

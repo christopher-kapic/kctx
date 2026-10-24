@@ -1,12 +1,53 @@
-node_modules
 .git
-.claude
-.ktg
-ralph
-kinetic-context
-*.md
+.gitignore
 .env
 .env.*
-!.env.example
+**/.env
+**/.env.*
+*.md
+.vscode
+.idea
+.claude
+.playwright-cli
+
+# Dependency stores
+node_modules
+**/node_modules
+.pnpm-store
+.pnpm-store*
+
+# Rust CLI — not part of the container images; keeping it out of the build
+# context stops CLI-only changes from busting Docker layer caches.
+apps/cli
+
+# Build outputs and generated artifacts
+dist
 **/dist
-**/generated
+build
+**/build
+coverage
+**/coverage
+packages/db/prisma/generated
+
+# Local dumps and app notes (notes/ is committed after onboarding; it must
+# still stay out of the image so a filled-in access matrix cannot land in the
+# build cache).
+backups
+**/backups
+notes
+**/notes
+
+# Local framework/tool caches
+.turbo
+**/.turbo
+.cache
+**/.cache
+.vite
+**/.vite
+.next
+**/.next
+.astro
+**/.astro
+apps/web/.tanstack
+*.tsbuildinfo
+**/*.tsbuildinfo

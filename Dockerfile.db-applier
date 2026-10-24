@@ -1,0 +1,148 @@
+# Database applier — guarded schema SQL / pg_dump / pg_restore. No app server.
+#
+# This image is the supported guarded restore entrypoint. Server and worker
+# retain pg_restore and helpers for legacy apply pre-dump validation; their
+# ordinary entrypoints reject every restore-only variable and are not a
+# capability sandbox. They call scripts/db-applier.sh in `apply` mode only.
+# Dokploy runs a deploy-gated one-shot job from this image in `apply`
+# mode. Daily backups and one-shot restores also use this image.
+#
+#   docker build -f Dockerfile.db-applier -t starter-db-applier .
+#   docker run --rm -e DATABASE_URL=... -e DB_APPLIER_MODE=backup starter-db-applier
+#   docker run --rm -e DATABASE_URL=... -e APPLY_SCHEMA=safe starter-db-applier apply
+#   docker run --rm -e DATABASE_URL=... -e RESTORE_BACKUP_S3_KEY=... -e RESTORE_CONFIRM=... starter-db-applier restore
+#
+# Runtime deps (prisma CLI, dotenv, @aws-sdk/client-s3) are NOT hand-pinned with
+# a bare `npm install` here — that would float every transitive dependency
+# outside the repo's pnpm-lock.yaml, catalog, and supply-chain gates, in the one
+# image that holds DB credentials and may pg_restore. Instead they are declared
+# as a dedicated workspace member (packages/db-applier), and the builder stage
+# `pnpm deploy`s that member's production closure — fully resolved from the
+# committed lockfile. Bump versions in packages/db-applier/package.json (or the
+# pnpm catalog) and run `pnpm install`, never by editing a version in this file.
+
+FROM node:24-slim AS base
+
+# postgresql-client-${PG_MAJOR} (pg_dump / pg_restore / psql) comes from the
+# upstream PostgreSQL apt repository (PGDG), pinned to PG_MAJOR, not from Debian's
+# default repo whose `postgresql-client` major can be older than the managed
+# server — pg_dump refuses to dump a NEWER server, so an old client silently
+# breaks every backup. PG_MAJOR must match your Postgres server's major
+# version and the same ARG in Dockerfile / Dockerfile.worker; `pnpm docker:check-copy` fails
+# on drift, and scripts/backup.sh re-checks client vs server at run time. A newer
+# client dumping an older server is supported; the reverse is not. The PGDG repo
+# is enabled by the script bundled with Debian's own postgresql-common (it carries
+# the signing key, so no curl/gnupg is needed) and the codename comes from
+# /etc/os-release. Keep this block in sync with the other two Dockerfiles
+# (AGENTS.md § keep in sync).
+ARG APT_CACHE_DATE=static
+ARG PG_MAJOR=17
+RUN echo "apt-cache-date: ${APT_CACHE_DATE}" \
+  && apt-get update -y && apt-get upgrade -y \
+  && apt-get install -y --no-install-recommends ca-certificates postgresql-common \
+  && . /etc/os-release \
+  && /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y "${VERSION_CODENAME:-}" \
+  && apt-get install -y \
+  cron \
+  gosu \
+  openssl \
+  postgresql-client-${PG_MAJOR} \
+  tini \
+  && rm -rf /var/lib/apt/lists/* \
+  && rm -f /etc/ssl/private/ssl-cert-snakeoil.key /etc/ssl/private/ssl-cert-snakeoil.pem
+
+# --- Builder: produce a lockfile-pinned, self-contained node_modules ---
+# `COPY . .` (rather than a hand-maintained per-member COPY list) keeps this
+# BUILDER stage out of the workspace-member COPY-list contract that governs
+# Dockerfile / Dockerfile.worker — it is built rarely (a nightly cron + one-shot
+# restores), so layer-cache granularity matters far less than not drifting a
+# second COPY list. The filtered install + `pnpm deploy` prune the workspace
+# down to exactly what this image runs. The RUNNER stage below is a hand-written
+# list and IS checked: `pnpm docker:check-copy` requires every sibling script
+# the shipped shell scripts invoke to be COPY'd here.
+FROM base AS builder
+
+RUN apt-get update -y && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable && corepack prepare pnpm@11.28.3 --activate
+
+WORKDIR /app
+COPY . .
+
+# The root `postinstall` runs lefthook (a dev-only git-hook installer) which
+# errors without a real .git — strip it before install, exactly as the app
+# Dockerfiles do.
+RUN node -e "const f='package.json';const p=JSON.parse(require('fs').readFileSync(f));delete p.scripts.postinstall;require('fs').writeFileSync(f,JSON.stringify(p,null,2))"
+
+RUN pnpm install --frozen-lockfile --filter @starter/db-applier
+
+# inject-workspace-packages avoids the pnpm v10+ non-injected-deploy error;
+# db-applier has no workspace dependencies, so injection is a no-op that yields a
+# clean, self-contained, lockfile-verified closure (no escaping symlinks).
+RUN pnpm --filter @starter/db-applier --config.inject-workspace-packages=true \
+  deploy --prod /app/deploy
+
+# Same TypeScript pruning as the app/worker images — Prisma falls back without it.
+RUN rm -rf /app/deploy/node_modules/.pnpm/typescript@* \
+  /app/deploy/node_modules/.pnpm/@typescript+typescript-* \
+  /app/deploy/node_modules/typescript
+
+# --- Runner ---
+FROM base AS runner
+
+WORKDIR /app
+
+COPY --chown=node:node --from=builder /app/deploy/node_modules ./node_modules
+
+# prisma.config.ts imports dotenv + prisma/config; the S3 helpers import
+# @aws-sdk/client-s3 — all provided by the deployed node_modules above.
+COPY packages/db/prisma.config.ts packages/db/package.json packages/db/
+COPY packages/db/prisma packages/db/prisma
+COPY scripts/backup.sh \
+     scripts/db-applier.sh \
+     scripts/apply-schema.mjs \
+     scripts/restore-archive.mjs \
+     scripts/db-applier-entrypoint.sh \
+     scripts/schema-fingerprint.sh \
+     scripts/write-db-applier-env.mjs \
+     scripts/upload-backup-to-s3.mjs \
+     scripts/download-backup-from-s3.mjs \
+     scripts/backup-heartbeat.mjs \
+     ./scripts/
+COPY scripts/lib/backup-identity.mjs scripts/lib/backup-s3-env.mjs scripts/lib/backup-env.sh scripts/lib/schema-diff.mjs scripts/lib/bounded-child.mjs scripts/lib/owned-child.sh scripts/lib/schema-fingerprint.mjs scripts/lib/prisma-diff-owner.mjs scripts/lib/collect-prisma.mjs ./scripts/lib/
+
+RUN chmod +x ./scripts/backup.sh ./scripts/db-applier.sh ./scripts/db-applier-entrypoint.sh ./scripts/schema-fingerprint.sh \
+  && mkdir -p /app/packages/db/node_modules/.bin /app/backups \
+  && ln -sf /app/node_modules/.bin/prisma /app/packages/db/node_modules/.bin/prisma \
+  && ln -sf /app/node_modules/prisma /app/packages/db/node_modules/prisma \
+  && chown -R node:node /app/node_modules /app/packages/db /app/backups
+
+# Strip the global npm CLI from the runtime image. The entrypoint runs `node`
+# directly and db-applier.sh invokes the COPY'd prisma binary by path (not
+# `npx`), so npm is never used at runtime. node:slim's bundled npm vendors its
+# own dependency tree (e.g. brace-expansion, ip-address, tar) that Trivy flags as
+# fixable HIGH CVEs we cannot patch via pnpm overrides — removing npm
+# eliminates that whole class, shrinks the image, and cuts attack surface.
+# Build stages keep npm; this only affects the final runner image.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+
+ENV NODE_ENV=production
+ENV PRISMA_BIN=/app/node_modules/.bin/prisma
+ENV PRISMA_CWD=/app/packages/db
+ENV PRISMA_SCHEMA_DIR=/app/packages/db/prisma/schema
+
+# root: schedule mode runs cron -f; backup/apply/restore drop to the node user via gosu.
+USER root
+
+# No CMD on purpose. The entrypoint resolves the mode as
+# `$1` -> DB_APPLIER_MODE -> backup; a `CMD ["backup"]` here would supply $1 on
+# every run that does not override the command, making DB_APPLIER_MODE dead
+# inside the image (a `schedule` service would loop one-shot backups, and a
+# restore job set with DB_APPLIER_MODE=restore would fatal on the leftover
+# restore variables). Platforms that want a specific mode pass it as the
+# command (e.g. a scheduled backup job passes `backup`); leave the command
+# blank and set DB_APPLIER_MODE instead for a one-shot
+# restore or an in-container scheduler.
+ENTRYPOINT ["tini", "--", "./scripts/db-applier-entrypoint.sh"]
